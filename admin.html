@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة تحكم المسؤولين</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+  :root{
+    --navy-950:#0D1727; --navy-900:#14213D; --navy-700:#243759;
+    --paper:#EEF0F4; --paper-raised:#FFFFFF;
+    --ink:#1A1F2B; --ink-soft:#5C6478;
+    --gold:#D9A441; --gold-soft:#F1DCAE;
+    --teal:#2E8B77; --teal-soft:#E3F1EC;
+    --coral:#C6483C; --coral-soft:#FBEAEA;
+    --line:rgba(20,33,61,0.10); --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--paper);}
+  body{ font-family:'Tajawal',sans-serif; color:var(--ink); }
+  button, select, input, textarea{ font-family:inherit; }
+
+  .topbar{
+    background:var(--navy-900); color:#fff; padding:16px 18px;
+    display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10;
+  }
+  .topbar h1{ font-family:'Space Grotesk',sans-serif; font-size:15px; margin:0; font-weight:700; }
+  html[dir="rtl"] .topbar h1{ font-family:'Tajawal',sans-serif; }
+  .topbar .badge-admin{ background:var(--gold); color:var(--navy-950); font-size:11px; padding:4px 10px; border-radius:999px; font-weight:800; }
+
+  .tabs{ display:flex; gap:6px; padding:14px 18px 0; max-width:960px; margin:0 auto; }
+  .tab{
+    padding:10px 18px; border-radius:10px 10px 0 0; font-size:13.5px; cursor:pointer;
+    color:var(--ink-soft); border:1px solid transparent;
+  }
+  .tab.active{ background:var(--paper-raised); border-color:var(--line); border-bottom-color:var(--paper-raised); color:var(--ink); font-weight:700; }
+
+  .container{ max-width:960px; margin:0 auto; padding:0 18px 60px; }
+  .panel{ background:var(--paper-raised); border:1px solid var(--line); border-radius:0 var(--radius) var(--radius) var(--radius); padding:20px; margin-top:-1px; }
+
+  .row-between{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:10px; }
+  .btn{
+    background:var(--navy-900); color:#fff; border:none; padding:10px 18px; border-radius:9px;
+    font-size:13.5px; font-weight:700; cursor:pointer;
+  }
+  .btn.secondary{ background:transparent; color:var(--navy-900); border:1px solid var(--line); }
+  .btn.danger{ background:var(--coral); }
+  .btn.small{ padding:7px 12px; font-size:12.5px; }
+
+  /* ---------- Competition management list ---------- */
+  .comp-item{ border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
+  .comp-item .head{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .comp-item h3{ font-family:'Space Grotesk',sans-serif; font-size:15.5px; margin:0 0 4px; }
+  html[dir="rtl"] .comp-item h3{ font-family:'Tajawal',sans-serif; }
+  .comp-item .status-pill{ font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; flex:none; }
+  .status-pill.open{ background:var(--teal-soft); color:var(--teal); }
+  .status-pill.closed{ background:var(--paper); color:var(--ink-soft); }
+
+  .funnel{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0; }
+  .funnel .step{ text-align:center; background:var(--paper); border-radius:10px; padding:10px 4px; }
+  .funnel .step strong{ display:block; font-family:'Space Grotesk',sans-serif; font-size:18px; color:var(--navy-900); }
+  .funnel .step span{ font-size:10.5px; color:var(--ink-soft); display:block; margin-top:2px; line-height:1.3; }
+
+  .comp-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+
+  /* ---------- Students table for a competition ---------- */
+  .students-table{ width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px; }
+  .students-table th{ text-align:start; color:var(--ink-soft); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--line); }
+  .students-table td{ padding:7px 8px; border-bottom:1px solid var(--line); }
+  .students-table select{ padding:4px 6px; border-radius:6px; border:1px solid var(--line); font-size:12px; }
+
+  /* ---------- Leaderboard ---------- */
+  .lb-row{ display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
+  .lb-rank{ width:30px; height:30px; border-radius:50%; background:var(--navy-900); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800; flex:none; }
+  .lb-rank.gold{ background:var(--gold); color:var(--navy-950); }
+  .lb-row .info strong{ display:block; font-size:14px; }
+  .lb-row .info span{ display:block; font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .lb-row .count{ margin-inline-start:auto; text-align:end; }
+  .lb-row .count strong{ display:block; font-family:'Space Grotesk',sans-serif; font-size:16px; }
+  .lb-row .count span{ font-size:10.5px; color:var(--ink-soft); }
+
+  /* ---------- Modal ---------- */
+  .modal-scrim{ position:fixed; inset:0; background:rgba(13,23,39,0.5); display:none; align-items:flex-end; justify-content:center; z-index:50; }
+  .modal-scrim.show{ display:flex; }
+  .modal{
+    background:var(--paper-raised); width:100%; max-width:560px; max-height:88vh; overflow-y:auto;
+    border-radius:18px 18px 0 0; padding:22px 20px 30px;
+  }
+  @media (min-width:640px){ .modal-scrim{ align-items:center; } .modal{ border-radius:16px; } }
+  .modal h2{ font-family:'Space Grotesk',sans-serif; font-size:17px; margin:0 0 16px; }
+  html[dir="rtl"] .modal h2{ font-family:'Tajawal',sans-serif; }
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:12.5px; font-weight:600; margin-bottom:6px; }
+  .field input, .field textarea, .field select{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:#FAFBFC; font-size:13.5px;
+  }
+  .field textarea{ resize:vertical; min-height:80px; }
+  .winner-input-row{ display:flex; gap:8px; margin-bottom:8px; }
+  .winner-input-row input{ flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--line); font-size:13px; }
+  .winner-input-row input.rank{ flex:0 0 60px; text-align:center; }
+</style>
+</head>
+<body>
+
+  <header class="topbar">
+    <h1>لوحة تحكم — رعاية الشباب</h1>
+    <span class="badge-admin">Admin</span>
+  </header>
+
+  <nav class="tabs">
+    <div class="tab active" data-tab="comps">المسابقات والإحصائيات</div>
+    <div class="tab" data-tab="lb">الأكثر تفوقًا</div>
+  </nav>
+
+  <div class="container">
+    <div class="panel" id="tabComps">
+      <div class="row-between">
+        <strong style="font-size:13.5px;color:var(--ink-soft);">إجمالي المسابقات: <span id="totalCount">0</span></strong>
+        <button class="btn" id="newCompBtn">+ إعلان مسابقة جديدة</button>
+      </div>
+      <div id="compList"><!-- injected --></div>
+    </div>
+
+    <div class="panel" id="tabLb" style="display:none;">
+      <h3 style="margin-top:0;font-family:'Space Grotesk',sans-serif;">🏅 الأكثر مشاركة</h3>
+      <div id="lbParticipation"></div>
+      <h3 style="font-family:'Space Grotesk',sans-serif;">🏆 الأكثر حصولًا على مراكز</h3>
+      <div id="lbWinners"></div>
+    </div>
+  </div>
+
+  <!-- ---------- Create/Edit competition modal ---------- -->
+  <div class="modal-scrim" id="compModalScrim">
+    <div class="modal">
+      <h2 id="compModalTitle">إعلان مسابقة جديدة</h2>
+      <form id="compForm">
+        <div class="field"><label>عنوان المسابقة</label><input type="text" id="fTitle" required></div>
+        <div class="field"><label>الوصف الكامل (التفاصيل، شروط التقديم...)</label><textarea id="fDesc" required></textarea></div>
+        <div class="field"><label>لينك المسابقة</label><input type="url" id="fLink" required></div>
+        <div class="field"><label>آخر موعد للتقديم (Deadline)</label><input type="datetime-local" id="fDeadline" required></div>
+        <div class="field"><label>مرفق PDF/Word (رابط بعد الرفع على Firebase Storage)</label><input type="text" id="fAttachUrl" placeholder="https://..."></div>
+        <div class="field"><label>اسم الملف المعروض</label><input type="text" id="fAttachName" placeholder="تفاصيل_المسابقة.pdf"></div>
+        <div class="row-between">
+          <button type="button" class="btn secondary" id="cancelCompBtn">إلغاء</button>
+          <button type="submit" class="btn" id="submitCompBtn">نشر المسابقة</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ---------- Close competition / winners modal ---------- -->
+  <div class="modal-scrim" id="winModalScrim">
+    <div class="modal">
+      <h2>إغلاق المسابقة وإعلان النتائج</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">أضف الفائزين بالترتيب — هيظهروا للطلبة فورًا بعد الحفظ.</p>
+      <div id="winnerInputs"></div>
+      <button type="button" class="btn secondary small" id="addWinnerRowBtn">+ إضافة فائز</button>
+      <div class="row-between" style="margin-top:18px;">
+        <button type="button" class="btn secondary" id="cancelWinBtn">إلغاء</button>
+        <button type="button" class="btn danger" id="confirmCloseBtn">تأكيد الإغلاق ونشر النتائج</button>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addDoc,
+    updateDoc, where, getDocs, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // TODO: same Firebase config as index.html / home.html
+  const firebaseConfig = {
+    apiKey: "AIzaSyCQKHkZNQbETMpNHvPf7i9PPJkACX_Jdh8", authDomain: "university-competitions-hub.firebaseapp.com",
+    projectId: "university-competitions-hub", storageBucket: "university-competitions-hub.firebasestorage.app",
+    messagingSenderId: "1024124311584", appId: "1:1024124311584:web:7a24fc5f632ab5eae70445",
+    measurementId: "G-VJVG1CFZKN"
+  };
+  const API_BASE = "https://YOUR-RAILWAY-APP.up.railway.app";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  let competitions = [];
+  let editingId = null;
+  let closingId = null;
+
+  // ---------- Admin-only guard ----------
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) { window.location.href = "index.html"; return; }
+    const snap = await getDoc(doc(db, "users", user.uid));
+    if (!snap.exists() || snap.data().role !== "admin") {
+      window.location.href = "home.html"; // not an admin — bounce to the student feed
+      return;
+    }
+    listenToCompetitions();
+    loadLeaderboard();
+  });
+
+  // ---------- Tabs ----------
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      document.getElementById("tabComps").style.display = tab.dataset.tab === "comps" ? "block" : "none";
+      document.getElementById("tabLb").style.display = tab.dataset.tab === "lb" ? "block" : "none";
+    });
+  });
+
+  // ---------- Listen to competitions + compute funnel stats ----------
+  function listenToCompetitions() {
+    const q = query(collection(db, "competitions"), orderBy("createdAt", "desc"));
+    onSnapshot(q, async (snap) => {
+      competitions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      document.getElementById("totalCount").textContent = competitions.length;
+      await renderCompetitionList();
+    });
+  }
+
+  // NOTE: for a small/medium number of students this client-side aggregation
+  // (reading all interaction docs per competition) is fine. If the school
+  // grows past a few thousand submissions, move this counting into a
+  // Cloud Function that maintains counters on the competition doc instead.
+  async function getInteractionStats(competitionId) {
+    const q = query(collection(db, "competition_interactions"), where("competitionId", "==", competitionId));
+    const snap = await getDocs(q);
+    const docs = snap.docs.map(d => d.data());
+    return {
+      viewed: docs.filter(d => d.viewedAt).length,
+      clicked: docs.filter(d => d.clickedLinkAt).length,
+      submitted: docs.filter(d => d.formSubmittedAt).length,
+      completed: docs.filter(d => d.followUpStatus === "completed").length,
+      dropped: docs.filter(d => d.followUpStatus === "dropped").length,
+      raw: docs
+    };
+  }
+
+  // Shared lookup: students who actually submitted the form for a competition,
+  // with their real names — used by both the follow-up table and the winners picker.
+  async function getSubmittedStudents(competitionId) {
+    const stats = await getInteractionStats(competitionId);
+    const submitted = stats.raw.filter(d => d.formSubmittedAt);
+    return Promise.all(submitted.map(async (d) => {
+      const uSnap = await getDoc(doc(db, "users", d.studentId));
+      const name = uSnap.exists() ? uSnap.data().fullName : d.studentId;
+      return { studentId: d.studentId, name, followUpStatus: d.followUpStatus || "registered" };
+    }));
+  }
+
+  async function renderCompetitionList() {
+    const container = document.getElementById("compList");
+    if (competitions.length === 0) {
+      container.innerHTML = `<p style="color:var(--ink-soft);font-size:13.5px;">لسه مفيش مسابقات — ابدأ بإضافة أول إعلان.</p>`;
+      return;
+    }
+
+    let html = "";
+    for (const c of competitions) {
+      const stats = await getInteractionStats(c.id);
+      html += `
+        <div class="comp-item" data-id="${c.id}">
+          <div class="head">
+            <div>
+              <span class="status-pill ${c.status}">${c.status === "open" ? "مفتوحة" : "منتهية"}</span>
+              <h3>${c.title}</h3>
+            </div>
+          </div>
+          <div class="funnel">
+            <div class="step"><strong>${stats.viewed}</strong><span>شاهدوا الإعلان</span></div>
+            <div class="step"><strong>${stats.clicked}</strong><span>دخلوا اللينك</span></div>
+            <div class="step"><strong>${stats.submitted}</strong><span>قدّموا الفورم</span></div>
+            <div class="step"><strong>${stats.completed}</strong><span>كملوا للنهاية</span></div>
+          </div>
+          <div class="comp-actions">
+            <button class="btn small secondary" data-action="toggle-students" data-id="${c.id}">متابعة الطلبة (${stats.submitted})</button>
+            ${c.status === "open"
+              ? `<button class="btn small danger" data-action="close" data-id="${c.id}">إغلاق المسابقة + نتائج</button>`
+              : `<button class="btn small secondary" data-action="reopen" data-id="${c.id}">إعادة فتح</button>`}
+          </div>
+          <div class="students-panel" id="students-${c.id}" style="display:none;"></div>
+        </div>`;
+    }
+    container.innerHTML = html;
+
+    container.querySelectorAll('[data-action="toggle-students"]').forEach(btn =>
+      btn.addEventListener("click", () => toggleStudentsPanel(btn.dataset.id)));
+    container.querySelectorAll('[data-action="close"]').forEach(btn =>
+      btn.addEventListener("click", () => openWinnerModal(btn.dataset.id)));
+    container.querySelectorAll('[data-action="reopen"]').forEach(btn =>
+      btn.addEventListener("click", () => updateDoc(doc(db, "competitions", btn.dataset.id), { status: "open" })));
+  }
+
+  // ---------- Per-student follow-up table ----------
+  async function toggleStudentsPanel(competitionId) {
+    const panel = document.getElementById(`students-${competitionId}`);
+    if (panel.style.display === "block") { panel.style.display = "none"; return; }
+
+    const rows = await getSubmittedStudents(competitionId);
+
+    if (rows.length === 0) {
+      panel.innerHTML = `<p style="font-size:12.5px;color:var(--ink-soft);margin-top:10px;">لسه مفيش طلبة قدّموا الفورم.</p>`;
+      panel.style.display = "block";
+      return;
+    }
+
+    panel.innerHTML = `
+      <table class="students-table">
+        <thead><tr><th>الطالب</th><th>حالة المتابعة</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td>${r.name}</td>
+              <td>
+                <select data-comp="${competitionId}" data-student="${r.studentId}" class="follow-select">
+                  <option value="registered" ${r.followUpStatus === "registered" ? "selected" : ""}>مسجّل</option>
+                  <option value="in_progress" ${r.followUpStatus === "in_progress" ? "selected" : ""}>مستمر</option>
+                  <option value="completed" ${r.followUpStatus === "completed" ? "selected" : ""}>كمّل للنهاية</option>
+                  <option value="dropped" ${r.followUpStatus === "dropped" ? "selected" : ""}>انسحب</option>
+                </select>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+    panel.style.display = "block";
+
+    panel.querySelectorAll(".follow-select").forEach(sel => {
+      sel.addEventListener("change", async () => {
+        const docId = `${sel.dataset.comp}_${sel.dataset.student}`;
+        await updateDoc(doc(db, "competition_interactions", docId), { followUpStatus: sel.value });
+      });
+    });
+  }
+
+  // ---------- Create competition modal ----------
+  document.getElementById("newCompBtn").addEventListener("click", () => {
+    editingId = null;
+    document.getElementById("compForm").reset();
+    document.getElementById("compModalScrim").classList.add("show");
+  });
+  document.getElementById("cancelCompBtn").addEventListener("click", () =>
+    document.getElementById("compModalScrim").classList.remove("show"));
+
+  document.getElementById("compForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const payload = {
+      title: document.getElementById("fTitle").value.trim(),
+      description: document.getElementById("fDesc").value.trim(),
+      link: document.getElementById("fLink").value.trim(),
+      deadline: document.getElementById("fDeadline").value,
+      attachmentUrl: document.getElementById("fAttachUrl").value.trim() || null,
+      attachmentName: document.getElementById("fAttachName").value.trim() || null,
+    };
+
+    // Publishing goes through the Flask API so the push-notification
+    // fan-out to students happens server-side (see backend/app.py).
+    const token = await auth.currentUser.getIdToken();
+    await fetch(`${API_BASE}/api/competitions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    });
+
+    document.getElementById("compModalScrim").classList.remove("show");
+  });
+
+  // ---------- Close competition + winners modal ----------
+  async function openWinnerModal(competitionId) {
+    closingId = competitionId;
+    document.getElementById("winnerInputs").innerHTML = `<p style="font-size:12.5px;color:var(--ink-soft);">بيتم تحميل الطلبة اللي قدّموا الفورم...</p>`;
+    document.getElementById("winModalScrim").classList.add("show");
+
+    const submitted = await getSubmittedStudents(competitionId);
+    document.getElementById("winnerInputs").innerHTML = "";
+
+    if (submitted.length === 0) {
+      document.getElementById("winnerInputs").innerHTML =
+        `<p style="font-size:12.5px;color:var(--coral);">مفيش طلبة قدّموا الفورم لسه — مينفعش تحدد فائزين قبل ما يكون في تسجيلات.</p>`;
+      return;
+    }
+    winnerCandidates = submitted; // {studentId, name} — used to populate each row's <select>
+    addWinnerRow();
+  }
+  document.getElementById("cancelWinBtn").addEventListener("click", () =>
+    document.getElementById("winModalScrim").classList.remove("show"));
+
+  let winnerCandidates = [];
+
+  function addWinnerRow() {
+    const wrap = document.getElementById("winnerInputs");
+    const rank = wrap.children.length + 1;
+    const row = document.createElement("div");
+    row.className = "winner-input-row";
+    row.innerHTML = `
+      <input type="number" class="rank" value="${rank}" min="1">
+      <select class="winner-select">
+        <option value="" disabled selected>اختر الطالب الفائز</option>
+        ${winnerCandidates.map(s => `<option value="${s.studentId}">${s.name}</option>`).join("")}
+      </select>`;
+    wrap.appendChild(row);
+  }
+  document.getElementById("addWinnerRowBtn").addEventListener("click", () => {
+    if (winnerCandidates.length > 0) addWinnerRow();
+  });
+
+  document.getElementById("confirmCloseBtn").addEventListener("click", async () => {
+    const rows = document.querySelectorAll("#winnerInputs .winner-input-row");
+    const winners = Array.from(rows).map(r => {
+      const select = r.querySelector(".winner-select");
+      const studentId = select.value;
+      if (!studentId) return null;
+      const name = select.options[select.selectedIndex].textContent;
+      return { rank: Number(r.querySelector(".rank").value), studentId, name };
+    }).filter(Boolean);
+
+    if (winners.length === 0) {
+      alert("اختر على الأقل طالب فائز واحد قبل التأكيد.");
+      return;
+    }
+
+    // Mark each winner's interaction record as a completed, won entry too —
+    // keeps the funnel stats and the winners list consistent with each other.
+    await Promise.all(winners.map(w =>
+      updateDoc(doc(db, "competition_interactions", `${closingId}_${w.studentId}`), {
+        followUpStatus: "completed",
+        finalResult: "won",
+        rank: w.rank
+      })
+    ));
+
+    await updateDoc(doc(db, "competitions", closingId), { status: "closed", winners });
+    document.getElementById("winModalScrim").classList.remove("show");
+  });
+
+  // ---------- Leaderboard ----------
+  async function loadLeaderboard() {
+    const snap = await getDocs(collection(db, "competition_interactions"));
+    const byStudent = {};
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (!byStudent[data.studentId]) byStudent[data.studentId] = { submissions: 0, wins: 0 };
+      if (data.formSubmittedAt) byStudent[data.studentId].submissions++;
+    });
+
+    // Count wins by scanning competitions' winners arrays (need student IDs
+    // matched by name here since winners are entered as free text — for a
+    // production build, store studentId alongside each winner entry).
+    const entries = await Promise.all(Object.entries(byStudent).map(async ([uid, v]) => {
+      const uSnap = await getDoc(doc(db, "users", uid));
+      const name = uSnap.exists() ? uSnap.data().fullName : uid;
+      return { uid, name, submissions: v.submissions };
+    }));
+
+    entries.sort((a, b) => b.submissions - a.submissions);
+    const top = entries.slice(0, 10);
+
+    document.getElementById("lbParticipation").innerHTML = top.map((e, i) => `
+      <div class="lb-row">
+        <span class="lb-rank ${i === 0 ? "gold" : ""}">${i + 1}</span>
+        <div class="info"><strong>${e.name}</strong><span>مشاركات مسجّلة</span></div>
+        <div class="count"><strong>${e.submissions}</strong><span>مسابقة</span></div>
+      </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px;">لا توجد بيانات كافية بعد.</p>`;
+
+    // Winners leaderboard: tally rank appearances across closed competitions,
+    // grouped by studentId (not name) — safe against duplicate/similar names.
+    const winCounts = {};
+    competitions.filter(c => c.status === "closed" && c.winners).forEach(c => {
+      c.winners.forEach(w => {
+        if (!w.studentId) return; // ignore any legacy entries saved before this fix
+        winCounts[w.studentId] = (winCounts[w.studentId] || 0) + 1;
+      });
+    });
+    const winEntries = await Promise.all(
+      Object.entries(winCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(async ([studentId, count]) => {
+          const uSnap = await getDoc(doc(db, "users", studentId));
+          const name = uSnap.exists() ? uSnap.data().fullName : studentId;
+          return { name, count };
+        })
+    );
+    document.getElementById("lbWinners").innerHTML = winEntries.map(({ name, count }, i) => `
+      <div class="lb-row">
+        <span class="lb-rank ${i === 0 ? "gold" : ""}">${i + 1}</span>
+        <div class="info"><strong>${name}</strong><span>حصل على مراكز</span></div>
+        <div class="count"><strong>${count}</strong><span>مركز</span></div>
+      </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px;">لسه مفيش نتائج معلنة.</p>`;
+  }
+</script>
+</body>
+</html>

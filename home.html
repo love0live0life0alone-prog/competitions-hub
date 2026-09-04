@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>المسابقات — الرئيسية</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14213D">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+  :root{
+    --navy-950:#0D1727; --navy-900:#14213D; --navy-700:#243759;
+    --paper:#EEF0F4; --paper-raised:#FFFFFF;
+    --ink:#1A1F2B; --ink-soft:#5C6478;
+    --gold:#D9A441; --gold-soft:#F1DCAE;
+    --teal:#2E8B77; --teal-soft:#E3F1EC;
+    --coral:#C6483C; --coral-soft:#FBEAEA;
+    --line:rgba(20,33,61,0.10);
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);}
+  body{
+    font-family:'Tajawal',sans-serif; color:var(--ink);
+    min-height:100vh; min-height:100dvh;
+  }
+  html[dir="ltr"] body{ font-family:'Inter','Space Grotesk',sans-serif; }
+  button{ font-family:inherit; }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:20;
+    background:var(--navy-900);
+    color:#fff;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px;
+  }
+  .topbar .left{ display:flex; align-items:center; gap:12px; }
+  .icon-btn{
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16);
+    color:#fff; width:38px; height:38px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    transition:background .15s ease;
+  }
+  .icon-btn:hover{ background:rgba(255,255,255,0.16); }
+  .icon-btn svg{ width:19px; height:19px; }
+  .topbar h1{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:16px; margin:0; }
+  html[dir="rtl"] .topbar h1{ font-family:'Tajawal',sans-serif; font-weight:700; }
+
+  /* ---------- Filter tabs ---------- */
+  .filters{
+    display:flex; gap:8px; padding:14px 16px 0; overflow-x:auto;
+  }
+  .filter-chip{
+    flex:none; padding:8px 16px; border-radius:999px; font-size:13.5px;
+    border:1px solid var(--line); background:var(--paper-raised); color:var(--ink-soft);
+    cursor:pointer; transition:all .15s ease; white-space:nowrap;
+  }
+  .filter-chip.active{ background:var(--navy-900); border-color:var(--navy-900); color:#fff; }
+
+  /* ---------- Feed ---------- */
+  .feed{ padding:16px; display:flex; flex-direction:column; gap:12px; max-width:720px; margin:0 auto; }
+  .empty-state{
+    text-align:center; padding:60px 20px; color:var(--ink-soft);
+  }
+  .empty-state svg{ width:44px; height:44px; opacity:.35; margin-bottom:12px; }
+
+  .card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; cursor:pointer; position:relative; overflow:hidden;
+    transition:box-shadow .18s ease, transform .12s ease;
+  }
+  .card:hover{ box-shadow:0 14px 30px -20px rgba(13,23,39,0.35); }
+  .card:active{ transform:scale(0.99); }
+  .card::before{
+    content:""; position:absolute; inset-inline-start:0; top:0; bottom:0; width:4px;
+  }
+  .card.status-open::before{ background:var(--teal); }
+  .card.status-closed::before{ background:var(--ink-soft); }
+  .card-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .badge{
+    font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:999px; flex:none;
+  }
+  .badge.open{ background:var(--teal-soft); color:var(--teal); }
+  .badge.closed{ background:var(--paper); color:var(--ink-soft); }
+  .card h3{
+    font-family:'Space Grotesk',sans-serif; font-size:16.5px; margin:8px 0 6px; line-height:1.4;
+  }
+  html[dir="rtl"] .card h3{ font-family:'Tajawal',sans-serif; font-weight:700; }
+  .card p{ font-size:13.5px; color:var(--ink-soft); margin:0 0 10px; line-height:1.6;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .card-meta{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); }
+  .card-meta svg{ width:14px; height:14px; flex:none; }
+  .card-meta.urgent{ color:var(--coral); font-weight:600; }
+
+  /* ---------- Sidebar drawer ---------- */
+  .scrim{
+    position:fixed; inset:0; background:rgba(13,23,39,0.45); opacity:0; pointer-events:none;
+    transition:opacity .2s ease; z-index:29;
+  }
+  .scrim.show{ opacity:1; pointer-events:auto; }
+  .sidebar{
+    position:fixed; top:0; bottom:0; inset-inline-start:0; width:82%; max-width:340px;
+    background:var(--navy-900); color:#fff; z-index:30;
+    transform:translateX(-105%); transition:transform .28s cubic-bezier(.22,.9,.35,1);
+    display:flex; flex-direction:column; padding:22px 18px;
+  }
+  html[dir="rtl"] .sidebar{ inset-inline-start:auto; inset-inline-end:0; transform:translateX(105%); }
+  .sidebar.open{ transform:translateX(0); }
+
+  .profile-block{ display:flex; align-items:center; gap:12px; padding-bottom:18px; border-bottom:1px solid rgba(255,255,255,0.12); }
+  .avatar{
+    width:46px; height:46px; border-radius:50%; background:var(--gold); color:var(--navy-950);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:17px; flex:none;
+  }
+  .profile-block strong{ display:block; font-size:15px; font-family:'Space Grotesk',sans-serif; }
+  html[dir="rtl"] .profile-block strong{ font-family:'Tajawal',sans-serif; }
+  .profile-block span{ display:block; font-size:12px; color:rgba(255,255,255,0.55); margin-top:2px; }
+
+  .side-section{ padding:18px 0; border-bottom:1px solid rgba(255,255,255,0.10); }
+  .side-section:last-child{ border-bottom:none; }
+  .side-label{ font-size:12px; color:rgba(255,255,255,0.45); margin:0 0 10px; }
+
+  .lang-row{ display:flex; gap:8px; }
+  .lang-row button{
+    flex:1; padding:9px; border-radius:9px; border:1px solid rgba(255,255,255,0.18);
+    background:transparent; color:rgba(255,255,255,0.75); font-size:13px; cursor:pointer;
+  }
+  .lang-row button.active{ background:rgba(255,255,255,0.14); color:#fff; border-color:rgba(255,255,255,0.3); }
+
+  .edit-field{ margin-bottom:10px; }
+  .edit-field label{ display:block; font-size:12px; color:rgba(255,255,255,0.55); margin-bottom:5px; }
+  .edit-field select{
+    width:100%; padding:9px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.18);
+    background:rgba(255,255,255,0.06); color:#fff; font-size:13.5px; font-family:inherit;
+  }
+  .edit-field select option{ color:#000; }
+  .save-btn{
+    width:100%; margin-top:6px; padding:10px; border-radius:8px; border:none;
+    background:var(--gold); color:var(--navy-950); font-weight:700; font-size:13.5px; cursor:pointer;
+  }
+
+  .contact-row{
+    display:flex; align-items:center; gap:10px; padding:10px 8px; border-radius:9px;
+    text-decoration:none; color:#fff; transition:background .15s ease;
+  }
+  .contact-row:hover{ background:rgba(255,255,255,0.06); }
+  .contact-row .wa-icon{
+    width:32px; height:32px; border-radius:50%; background:#25D366; display:flex; align-items:center; justify-content:center; flex:none;
+  }
+  .contact-row .wa-icon svg{ width:17px; height:17px; fill:#fff; }
+  .contact-row div strong{ display:block; font-size:13.5px; }
+  .contact-row div span{ display:block; font-size:11.5px; color:rgba(255,255,255,0.5); }
+
+  .logout-btn{
+    margin-top:auto; padding-top:16px; text-align:center; font-size:13px;
+    color:rgba(255,255,255,0.55); background:none; border:none; cursor:pointer;
+  }
+
+  /* ---------- Detail overlay ---------- */
+  .detail-overlay{
+    position:fixed; inset:0; background:var(--paper); z-index:40;
+    transform:translateY(100%); transition:transform .3s cubic-bezier(.22,.9,.35,1);
+    overflow-y:auto;
+  }
+  .detail-overlay.open{ transform:translateY(0); }
+  .detail-head{
+    background:var(--navy-900); color:#fff; padding:16px; display:flex; align-items:center; gap:12px;
+    position:sticky; top:0;
+  }
+  .detail-body{ padding:20px 18px 60px; max-width:640px; margin:0 auto; }
+  .detail-body .badge{ margin-bottom:10px; display:inline-block; }
+  .detail-body h2{ font-family:'Space Grotesk',sans-serif; font-size:22px; margin:0 0 10px; line-height:1.35; }
+  html[dir="rtl"] .detail-body h2{ font-family:'Tajawal',sans-serif; font-weight:900; }
+  .detail-body .desc{ font-size:14.5px; line-height:1.8; color:var(--ink); margin-bottom:20px; white-space:pre-line; }
+  .deadline-box{
+    display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:12px;
+    background:var(--paper-raised); border:1px solid var(--line); margin-bottom:16px; font-size:13.5px;
+  }
+  .deadline-box.urgent{ background:var(--coral-soft); border-color:#F0CFCB; color:var(--coral); }
+  .attachment-row{
+    display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:12px;
+    background:var(--paper-raised); border:1px solid var(--line); margin-bottom:20px;
+  }
+  .attachment-row svg{ width:26px; height:26px; flex:none; color:var(--navy-700); }
+  .attachment-row .name{ flex:1; font-size:13.5px; font-weight:500; }
+  .attachment-row a{ font-size:12.5px; color:var(--navy-700); text-decoration:none; font-weight:600; }
+
+  .cta-link{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    background:var(--navy-900); color:#fff; text-decoration:none; padding:14px; border-radius:10px;
+    font-weight:700; font-size:14.5px; margin-bottom:10px;
+  }
+  .cta-secondary{
+    display:block; text-align:center; padding:12px; border-radius:10px; border:1px solid var(--line);
+    color:var(--ink); text-decoration:none; font-size:13.5px; font-weight:500;
+  }
+
+  .winners-box{
+    background:linear-gradient(135deg, var(--navy-900), var(--navy-700));
+    color:#fff; border-radius:14px; padding:18px; margin-bottom:20px;
+  }
+  .winners-box h3{ font-family:'Space Grotesk',sans-serif; font-size:15px; margin:0 0 12px; color:var(--gold-soft); }
+  html[dir="rtl"] .winners-box h3{ font-family:'Tajawal',sans-serif; }
+  .winner-row{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.1); }
+  .winner-row:last-child{ border-bottom:none; }
+  .winner-rank{
+    width:26px; height:26px; border-radius:50%; background:var(--gold); color:var(--navy-950);
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex:none;
+  }
+  .winner-row span{ font-size:13.5px; }
+
+  @media (min-width:760px){
+    .feed{ padding:24px; }
+    .sidebar{ width:320px; }
+  }
+</style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="left">
+      <button class="icon-btn" id="menuBtn" aria-label="menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <h1 id="pageTitle">إعلانات المسابقات</h1>
+    </div>
+  </header>
+
+  <nav class="filters" id="filters">
+    <button class="filter-chip active" data-filter="all" id="chipAll">الكل</button>
+    <button class="filter-chip" data-filter="open" id="chipOpen">مسابقات مفتوحة</button>
+    <button class="filter-chip" data-filter="closed" id="chipClosed">انتهت</button>
+  </nav>
+
+  <main class="feed" id="feed">
+    <!-- competition cards injected here -->
+  </main>
+
+  <!-- ---------- Sidebar ---------- -->
+  <div class="scrim" id="scrim"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="profile-block">
+      <div class="avatar" id="avatarInitial">؟</div>
+      <div>
+        <strong id="sideName">—</strong>
+        <span id="sideMeta">—</span>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <p class="side-label" id="lblLang">اللغة</p>
+      <div class="lang-row">
+        <button data-lang="ar" id="btnAr">العربية</button>
+        <button data-lang="en" id="btnEn">English</button>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <p class="side-label" id="lblEdit">تعديل البيانات</p>
+      <div class="edit-field">
+        <label id="lblDept">القسم</label>
+        <select id="editDept">
+          <option>هندسة الإنتاج</option><option>هندسة القوى الميكانيكية</option>
+          <option>هندسة الحاسبات</option><option>الهندسة الكهربية</option>
+        </select>
+      </div>
+      <div class="edit-field">
+        <label id="lblMajor">التخصص</label>
+        <select id="editMajor">
+          <option>عام</option><option>تصنيع</option><option>تصميم ميكانيكي</option>
+        </select>
+      </div>
+      <div class="edit-field">
+        <label id="lblYear">الفرقة</label>
+        <select id="editYear">
+          <option>الأولى</option><option>الثانية</option><option>الثالثة</option><option>الرابعة</option>
+        </select>
+      </div>
+      <button class="save-btn" id="saveProfileBtn">حفظ التعديلات</button>
+    </div>
+
+    <div class="side-section" id="contactSection">
+      <p class="side-label" id="lblContact">تواصل معنا — رعاية الشباب</p>
+      <div id="contactList"></div>
+    </div>
+
+    <button class="logout-btn" id="logoutBtn">تسجيل الخروج</button>
+  </aside>
+
+  <!-- ---------- Competition detail overlay ---------- -->
+  <div class="detail-overlay" id="detailOverlay">
+    <div class="detail-head">
+      <button class="icon-btn" id="closeDetailBtn" aria-label="close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <h1 id="detailHeadTitle" style="font-size:15px;">تفاصيل المسابقة</h1>
+    </div>
+    <div class="detail-body" id="detailBody"><!-- injected --></div>
+  </div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, collection, query, orderBy, onSnapshot
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // TODO: same config as index.html
+  const firebaseConfig = {
+    apiKey: "AIzaSyCQKHkZNQbETMpNHvPf7i9PPJkACX_Jdh8",
+    authDomain: "university-competitions-hub.firebaseapp.com",
+    projectId: "university-competitions-hub",
+    storageBucket: "university-competitions-hub.firebasestorage.app",
+    messagingSenderId: "1024124311584",
+    appId: "1:1024124311584:web:7a24fc5f632ab5eae70445",
+    measurementId: "G-VJVG1CFZKN"
+  };
+  const ALLOWED_DOMAIN = "feng.bu.edu.eg";
+  const API_BASE = "https://YOUR-RAILWAY-APP.up.railway.app"; // Flask backend URL
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  let currentUser = null;
+  let userProfile = null;
+  let idToken = null;
+  let competitions = [];
+  let activeFilter = "all";
+  let current = localStorage.getItem("uch_lang") || "ar";
+
+  // ---------- Auth guard ----------
+  onAuthStateChanged(auth, async (user) => {
+    if (!user || !(user.email || "").toLowerCase().endsWith("@" + ALLOWED_DOMAIN)) {
+      window.location.href = "index.html";
+      return;
+    }
+    currentUser = user;
+    idToken = await user.getIdToken();
+
+    const snap = await getDoc(doc(db, "users", user.uid));
+    userProfile = snap.exists() ? snap.data() : null;
+    renderProfile();
+    listenToCompetitions();
+  });
+
+  function renderProfile() {
+    if (!userProfile) return;
+    document.getElementById("sideName").textContent = userProfile.fullName || currentUser.email;
+    document.getElementById("avatarInitial").textContent = (userProfile.fullName || "?").trim().charAt(0);
+    document.getElementById("sideMeta").textContent =
+      `${userProfile.department || ""} · ${strings[current].yearPrefix} ${userProfile.academicYear || ""}`;
+    if (userProfile.department) document.getElementById("editDept").value = userProfile.department;
+    if (userProfile.major) document.getElementById("editMajor").value = userProfile.major;
+    if (userProfile.academicYear) document.getElementById("editYear").value = userProfile.academicYear;
+  }
+
+  // ---------- Save profile edits (department/major/year only) ----------
+  document.getElementById("saveProfileBtn").addEventListener("click", async () => {
+    await setDoc(doc(db, "users", currentUser.uid), {
+      department: document.getElementById("editDept").value,
+      major: document.getElementById("editMajor").value,
+      academicYear: document.getElementById("editYear").value,
+    }, { merge: true });
+    userProfile = { ...userProfile,
+      department: document.getElementById("editDept").value,
+      major: document.getElementById("editMajor").value,
+      academicYear: document.getElementById("editYear").value
+    };
+    renderProfile();
+    closeSidebar();
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => signOut(auth));
+
+  // ---------- Contacts (youth-care staff) ----------
+  const contacts = [
+    { name: "أ. محمد عبد الله", role: "مسؤول رعاية الشباب", phone: "20100XXXXXXX" },
+    { name: "أ. سارة حسن", role: "منسقة المسابقات", phone: "20101XXXXXXX" }
+  ];
+  function renderContacts() {
+    const list = document.getElementById("contactList");
+    list.innerHTML = contacts.map(c => `
+      <a class="contact-row" href="https://wa.me/${c.phone}" target="_blank" rel="noopener">
+        <span class="wa-icon"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2zm5.7 14.2c-.2.6-1.4 1.2-1.9 1.2-.5.1-1.1.1-1.8-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1.1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5.2.6.7 1.9.8 2 .1.2.1.4 0 .6-.1.2-.2.3-.4.5-.2.2-.4.4-.5.6-.2.2-.4.4-.2.7.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.6 2.9 1.8.3.1.5.1.7-.1.2-.2.8-.9 1-1.2.2-.3.4-.3.7-.2.3.1 1.9.9 2.2 1.1.3.1.5.2.6.3.1.2.1.9-.1 1.5z"/></svg></span>
+        <div><strong>${c.name}</strong><span>${c.role}</span></div>
+      </a>`).join("");
+  }
+  renderContacts();
+
+  // ---------- Competitions feed (realtime) ----------
+  function listenToCompetitions() {
+    const q = query(collection(db, "competitions"), orderBy("createdAt", "desc"));
+    onSnapshot(q, (snap) => {
+      competitions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderFeed();
+    });
+  }
+
+  function isUrgent(deadline) {
+    const diff = new Date(deadline) - new Date();
+    return diff > 0 && diff < 1000 * 60 * 60 * 48; // < 48h left
+  }
+
+  function renderFeed() {
+    const feed = document.getElementById("feed");
+    let list = competitions;
+    if (activeFilter !== "all") list = list.filter(c => c.status === activeFilter);
+
+    if (list.length === 0) {
+      feed.innerHTML = `<div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+        <p>${strings[current].empty}</p></div>`;
+      return;
+    }
+
+    feed.innerHTML = list.map(c => {
+      const urgent = c.status === "open" && isUrgent(c.deadline);
+      return `
+      <article class="card status-${c.status}" data-id="${c.id}">
+        <div class="card-top">
+          <span class="badge ${c.status}">${c.status === "open" ? strings[current].open : strings[current].closed}</span>
+        </div>
+        <h3>${c.title}</h3>
+        <p>${c.description || ""}</p>
+        <div class="card-meta ${urgent ? "urgent" : ""}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          <span>${c.status === "open" ? strings[current].deadlinePrefix + " " + formatDate(c.deadline) : strings[current].ended}</span>
+        </div>
+      </article>`;
+    }).join("");
+
+    document.querySelectorAll(".card").forEach(card => {
+      card.addEventListener("click", () => openDetail(card.dataset.id));
+    });
+
+    gsap.fromTo(".card", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .4, stagger: .05, ease: "power2.out" });
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString(current === "ar" ? "ar-EG" : "en-GB", { day: "numeric", month: "short" });
+  }
+
+  // ---------- Filter chips ----------
+  document.getElementById("filters").addEventListener("click", (e) => {
+    const btn = e.target.closest(".filter-chip");
+    if (!btn) return;
+    document.querySelectorAll(".filter-chip").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeFilter = btn.dataset.filter;
+    renderFeed();
+  });
+
+  // ---------- Interaction logging ----------
+  async function logInteraction(competitionId, event) {
+    try {
+      await fetch(`${API_BASE}/api/interactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${idToken}` },
+        body: JSON.stringify({ competitionId, event })
+      });
+    } catch (e) {
+      // Offline — queue for background sync (handled by sw.js "sync-interactions")
+      if ("serviceWorker" in navigator && "SyncManager" in window) {
+        const reg = await navigator.serviceWorker.ready;
+        reg.sync.register("sync-interactions").catch(() => {});
+      }
+    }
+  }
+
+  // ---------- Detail overlay ----------
+  function openDetail(id) {
+    const c = competitions.find(x => x.id === id);
+    if (!c) return;
+    logInteraction(id, "view");
+
+    const body = document.getElementById("detailBody");
+    const urgent = c.status === "open" && isUrgent(c.deadline);
+
+    let winnersHtml = "";
+    if (c.status === "closed" && c.winners && c.winners.length) {
+      winnersHtml = `<div class="winners-box"><h3>${strings[current].winnersTitle}</h3>
+        ${c.winners.map(w => `<div class="winner-row"><span class="winner-rank">${w.rank}</span><span>${w.name}</span></div>`).join("")}
+      </div>`;
+    }
+
+    let attachmentHtml = "";
+    if (c.attachmentUrl) {
+      attachmentHtml = `<div class="attachment-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+        <span class="name">${c.attachmentName || strings[current].attachment}</span>
+        <a href="${c.attachmentUrl}" target="_blank" rel="noopener">${strings[current].openFile}</a>
+      </div>`;
+    }
+
+    let ctaHtml = "";
+    if (c.status === "open") {
+      ctaHtml = `<a class="cta-link" id="ctaLink" href="${c.link}" target="_blank" rel="noopener">${strings[current].applyNow}</a>`;
+    }
+
+    body.innerHTML = `
+      <span class="badge ${c.status}">${c.status === "open" ? strings[current].open : strings[current].closed}</span>
+      <h2>${c.title}</h2>
+      <div class="deadline-box ${urgent ? "urgent" : ""}">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        <span>${c.status === "open" ? strings[current].deadlinePrefix + " " + formatDate(c.deadline) : strings[current].ended}</span>
+      </div>
+      ${winnersHtml}
+      <p class="desc">${c.description || ""}</p>
+      ${attachmentHtml}
+      ${ctaHtml}
+    `;
+
+    const ctaLink = document.getElementById("ctaLink");
+    if (ctaLink) ctaLink.addEventListener("click", () => logInteraction(id, "click"));
+
+    document.getElementById("detailOverlay").classList.add("open");
+  }
+  document.getElementById("closeDetailBtn").addEventListener("click", () => {
+    document.getElementById("detailOverlay").classList.remove("open");
+  });
+
+  // ---------- Sidebar open/close ----------
+  function openSidebar() {
+    document.getElementById("sidebar").classList.add("open");
+    document.getElementById("scrim").classList.add("show");
+  }
+  function closeSidebar() {
+    document.getElementById("sidebar").classList.remove("open");
+    document.getElementById("scrim").classList.remove("show");
+  }
+  document.getElementById("menuBtn").addEventListener("click", openSidebar);
+  document.getElementById("scrim").addEventListener("click", closeSidebar);
+
+  // ---------- i18n ----------
+  const strings = {
+    ar: {
+      dir:"rtl", lang:"ar", pageTitle:"إعلانات المسابقات",
+      all:"الكل", open:"مسابقات مفتوحة", closed:"انتهت",
+      lang_label:"اللغة", edit_label:"تعديل البيانات", contact_label:"تواصل معنا — رعاية الشباب",
+      dept:"القسم", major:"التخصص", year:"الفرقة", save:"حفظ التعديلات", logout:"تسجيل الخروج",
+      empty:"مفيش إعلانات دلوقتي، تابعنا أول بأول.",
+      deadlinePrefix:"آخر موعد للتقديم:", ended:"المسابقة انتهت", yearPrefix:"الفرقة",
+      winnersTitle:"🏆 المراكز الفائزة", attachment:"مرفق المسابقة", openFile:"فتح", applyNow:"التقديم للمسابقة"
+    },
+    en: {
+      dir:"ltr", lang:"en", pageTitle:"Competition Announcements",
+      all:"All", open:"Open", closed:"Closed",
+      lang_label:"Language", edit_label:"Edit profile", contact_label:"Contact us — Student Affairs",
+      dept:"Department", major:"Major", year:"Academic year", save:"Save changes", logout:"Sign out",
+      empty:"No announcements yet — check back soon.",
+      deadlinePrefix:"Deadline:", ended:"Competition ended", yearPrefix:"Year",
+      winnersTitle:"🏆 Winners", attachment:"Competition attachment", openFile:"Open", applyNow:"Apply now"
+    }
+  };
+
+  function applyLang(code) {
+    current = code;
+    const s = strings[code];
+    document.documentElement.setAttribute("dir", s.dir);
+    document.documentElement.setAttribute("lang", s.lang);
+    document.getElementById("pageTitle").textContent = s.pageTitle;
+    document.getElementById("chipAll").textContent = s.all;
+    document.getElementById("chipOpen").textContent = s.open;
+    document.getElementById("chipClosed").textContent = s.closed;
+    document.getElementById("lblLang").textContent = s.lang_label;
+    document.getElementById("lblEdit").textContent = s.edit_label;
+    document.getElementById("lblContact").textContent = s.contact_label;
+    document.getElementById("lblDept").textContent = s.dept;
+    document.getElementById("lblMajor").textContent = s.major;
+    document.getElementById("lblYear").textContent = s.year;
+    document.getElementById("saveProfileBtn").textContent = s.save;
+    document.getElementById("logoutBtn").textContent = s.logout;
+    document.getElementById("btnAr").classList.toggle("active", code === "ar");
+    document.getElementById("btnEn").classList.toggle("active", code === "en");
+    localStorage.setItem("uch_lang", code);
+    renderProfile();
+    renderFeed();
+  }
+  document.getElementById("btnAr").addEventListener("click", () => applyLang("ar"));
+  document.getElementById("btnEn").addEventListener("click", () => applyLang("en"));
+  applyLang(current);
+
+  // Register service worker
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(console.error);
+  }
+</script>
+</body>
+</html>

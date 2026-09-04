@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ملتقى مسابقات الجامعة</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14213D">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+  :root{
+    --navy-950:#0D1727;
+    --navy-900:#14213D;
+    --navy-700:#243759;
+    --paper:#EEF0F4;
+    --paper-raised:#FFFFFF;
+    --ink:#1A1F2B;
+    --ink-soft:#5C6478;
+    --gold:#D9A441;
+    --gold-soft:#F1DCAE;
+    --teal:#2E8B77;
+    --line:rgba(20,33,61,0.10);
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--paper);}
+  body{
+    font-family:'Tajawal',sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    overflow-x:hidden;
+  }
+  html[dir="ltr"] body{ font-family:'Inter','Space Grotesk',sans-serif; }
+
+  /* ---------- Identity band ---------- */
+  .identity{
+    position:relative;
+    background:radial-gradient(120% 140% at 15% 0%, var(--navy-700) 0%, var(--navy-900) 45%, var(--navy-950) 100%);
+    color:#fff;
+    padding:36px 24px 56px;
+    overflow:hidden;
+  }
+  .identity svg.rings{
+    position:absolute;
+    top:-40px;
+    inset-inline-end:-60px;
+    width:260px;
+    height:260px;
+    opacity:0.9;
+  }
+  .top-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    position:relative;
+    z-index:2;
+  }
+  .brandmark{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:.2px;
+    color:rgba(255,255,255,0.85);
+  }
+  .brandmark .dot{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--gold);
+  }
+  .lang-toggle{
+    border:1px solid rgba(255,255,255,0.25);
+    background:rgba(255,255,255,0.06);
+    color:#fff;
+    font-family:inherit;
+    font-size:13px;
+    padding:7px 14px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:background .18s ease, border-color .18s ease;
+  }
+  .lang-toggle:hover{ background:rgba(255,255,255,0.14); border-color:rgba(255,255,255,0.4); }
+  .lang-toggle:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+
+  .identity-copy{ position:relative; z-index:2; margin-top:38px; max-width:420px; }
+  .identity-copy h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:clamp(26px,6vw,34px);
+    line-height:1.25;
+    margin:0 0 10px;
+  }
+  html[dir="rtl"] .identity-copy h1{ font-family:'Tajawal',sans-serif; font-weight:900; }
+  .identity-copy p{
+    font-size:15px;
+    line-height:1.7;
+    color:rgba(255,255,255,0.72);
+    margin:0;
+  }
+  .stat-strip{
+    position:relative;
+    z-index:2;
+    display:flex;
+    gap:22px;
+    margin-top:26px;
+  }
+  .stat-strip div{ display:flex; flex-direction:column; }
+  .stat-strip strong{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:20px;
+    color:var(--gold-soft);
+  }
+  .stat-strip span{
+    font-size:12px;
+    color:rgba(255,255,255,0.55);
+    margin-top:2px;
+  }
+
+  /* ---------- Form panel ---------- */
+  .panel{
+    flex:1;
+    background:var(--paper);
+    padding:28px 22px 40px;
+    margin-top:-26px;
+    position:relative;
+    z-index:3;
+  }
+  .card{
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:26px 22px;
+    box-shadow:0 18px 40px -22px rgba(13,23,39,0.28);
+    max-width:460px;
+    margin:0 auto;
+  }
+  .card h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:19px;
+    margin:0 0 4px;
+  }
+  html[dir="rtl"] .card h2{ font-family:'Tajawal',sans-serif; font-weight:700; }
+  .card p.hint{
+    font-size:13.5px;
+    color:var(--ink-soft);
+    margin:0 0 22px;
+    line-height:1.6;
+  }
+
+  .field{ margin-bottom:16px; }
+  .field label{
+    display:block;
+    font-size:13px;
+    font-weight:500;
+    color:var(--ink);
+    margin-bottom:7px;
+  }
+  .field select, .field input{
+    width:100%;
+    padding:12px 14px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:#FAFBFC;
+    font-family:inherit;
+    font-size:14.5px;
+    color:var(--ink);
+    appearance:none;
+    -webkit-appearance:none;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  html[dir="rtl"] .field select{ background-position:left 14px center; }
+  .field select{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235C6478' stroke-width='1.6' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 14px center;
+    padding-inline-end:34px;
+  }
+  .field select:focus, .field input:focus{
+    outline:none;
+    border-color:var(--navy-700);
+    background:#fff;
+  }
+  .field .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .btn-primary{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    background:var(--navy-900);
+    color:#fff;
+    border:none;
+    padding:14px 16px;
+    border-radius:10px;
+    font-family:inherit;
+    font-weight:700;
+    font-size:15px;
+    cursor:pointer;
+    margin-top:6px;
+    transition:background .18s ease, transform .12s ease;
+  }
+  .btn-primary:hover{ background:var(--navy-700); }
+  .btn-primary:active{ transform:scale(0.985); }
+  .btn-primary:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+  .btn-primary svg{ width:18px; height:18px; flex:none; }
+
+  .divider{
+    display:flex; align-items:center; gap:10px;
+    margin:20px 0 16px;
+    color:var(--ink-soft);
+    font-size:12px;
+  }
+  .divider::before, .divider::after{
+    content:""; flex:1; height:1px; background:var(--line);
+  }
+
+  .id-fields{ display:none; }
+  .id-fields.show{ display:block; }
+
+  .foot-note{
+    text-align:center;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-top:22px;
+    line-height:1.7;
+  }
+  .foot-note a{ color:var(--navy-700); text-decoration:none; font-weight:500; }
+
+  [data-anim]{ opacity:0; }
+
+  @media (min-width:760px){
+    body{ flex-direction:row; }
+    .identity{ width:44%; padding:56px 48px; display:flex; flex-direction:column; justify-content:center; }
+    .identity-copy{ margin-top:28px; max-width:360px; }
+    .panel{ width:56%; margin-top:0; display:flex; align-items:center; padding:40px; }
+    .card{ width:100%; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    [data-anim]{ opacity:1 !important; transform:none !important; }
+  }
+</style>
+</head>
+<body>
+
+  <section class="identity">
+    <svg class="rings" viewBox="0 0 200 200" fill="none">
+      <circle cx="140" cy="70" r="70" stroke="#D9A441" stroke-opacity="0.35" stroke-width="1.5"/>
+      <circle cx="140" cy="70" r="46" stroke="#D9A441" stroke-opacity="0.55" stroke-width="1.5"/>
+      <circle cx="140" cy="70" r="22" fill="#D9A441" fill-opacity="0.9"/>
+    </svg>
+
+    <div class="top-row">
+      <div class="brandmark"><span class="dot"></span><span id="brandText">رعاية الشباب — كلية الهندسة</span></div>
+      <button class="lang-toggle" id="langToggle" type="button">English</button>
+    </div>
+
+    <div class="identity-copy">
+      <h1 id="heroTitle" data-anim>كل مسابقات جامعتك في مكان واحد</h1>
+      <p id="heroSub" data-anim>سجّل بإيميلك الجامعي، وتابع كل الإعلانات ومواعيد التقديم والنتائج أول بأول.</p>
+    </div>
+
+    <div class="stat-strip" data-anim id="statStrip">
+      <div><strong>+40</strong><span>مسابقة نشطة</span></div>
+      <div><strong>4</strong><span>أقسام</span></div>
+      <div><strong>لحظي</strong><span>إشعارات فورية</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="card" data-anim id="loginCard">
+      <h2 id="cardTitle">تسجيل الدخول</h2>
+      <p class="hint" id="cardHint">استخدم إيميلك الجامعي (Gmail) للدخول أو إنشاء حسابك.</p>
+
+      <button class="btn-primary" id="googleBtn" type="button">
+        <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.5 29.6 3.5 24 3.5 12.7 3.5 3.5 12.7 3.5 24S12.7 44.5 24 44.5 44.5 35.3 44.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.9 19 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 5.5 29.6 3.5 24 3.5c-7.7 0-14.3 4.4-17.7 11.2z"/><path fill="#4CAF50" d="M24 44.5c5.5 0 10.4-1.9 14-5l-6.5-5.4c-2 1.4-4.6 2.4-7.5 2.4-5.3 0-9.7-3.4-11.3-8.1l-6.6 5.1C9.6 40 16.3 44.5 24 44.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.4-2.4 4.4-4.5 5.7l6.5 5.4C41.4 35.5 44.5 30.2 44.5 24c0-1.2-.1-2.4-.3-3.5z"/></svg>
+        <span id="googleBtnText">الدخول بإيميل الجامعة</span>
+      </button>
+
+      <p id="authError" role="alert" style="display:none; margin:12px 0 0; padding:11px 14px; border-radius:10px; background:#FBEAEA; border:1px solid #EFC6C6; color:#A5342C; font-size:13px; line-height:1.6;"></p>
+
+      <div class="divider"><span id="dividerText">أول مرة تدخل؟ كمّل بياناتك</span></div>
+
+      <form id="profileForm">
+        <div class="field">
+          <label id="lblDept">القسم</label>
+          <select id="dept">
+            <option>هندسة الإنتاج</option>
+            <option>هندسة القوى الميكانيكية</option>
+            <option>هندسة الحاسبات</option>
+            <option>الهندسة الكهربية</option>
+          </select>
+        </div>
+        <div class="field row2">
+          <div>
+            <label id="lblMajor">التخصص</label>
+            <select id="major">
+              <option>عام</option>
+              <option>تصنيع</option>
+              <option>تصميم ميكانيكي</option>
+            </select>
+          </div>
+          <div>
+            <label id="lblYear">الفرقة</label>
+            <select id="year">
+              <option>الأولى</option>
+              <option>الثانية</option>
+              <option>الثالثة</option>
+              <option>الرابعة</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label id="lblSid">الرقم الجامعي</label>
+          <input type="text" id="studentId" placeholder="مثال: 2021123456" inputmode="numeric">
+        </div>
+      </form>
+
+      <p class="foot-note" id="footNote">بالمتابعة أنت توافق على استخدام بياناتك الجامعية لعرض المسابقات المناسبة لقسمك فقط.</p>
+    </div>
+  </section>
+
+<script>
+  // ---------- i18n ----------
+  const strings = {
+    ar: {
+      dir:"rtl", lang:"ar",
+      brand:"رعاية الشباب — كلية الهندسة",
+      toggle:"English",
+      heroTitle:"كل مسابقات جامعتك في مكان واحد",
+      heroSub:"سجّل بإيميلك الجامعي، وتابع كل الإعلانات ومواعيد التقديم والنتائج أول بأول.",
+      stat1:"مسابقة نشطة", stat2:"أقسام", stat3:"إشعارات فورية", stat3v:"لحظي",
+      cardTitle:"تسجيل الدخول",
+      cardHint:"استخدم إيميلك الجامعي (Gmail) للدخول أو إنشاء حسابك.",
+      googleBtn:"الدخول بإيميل الجامعة",
+      divider:"أول مرة تدخل؟ كمّل بياناتك",
+      lblDept:"القسم", lblMajor:"التخصص", lblYear:"الفرقة", lblSid:"الرقم الجامعي",
+      footNote:"بالمتابعة أنت توافق على استخدام بياناتك الجامعية لعرض المسابقات المناسبة لقسمك فقط.",
+      errDomain:"الدخول متاح فقط بإيميل الجامعة الذي ينتهي بـ @feng.bu.edu.eg — من فضلك سجّل بإيميلك الجامعي.",
+      errGeneric:"حصل خطأ أثناء تسجيل الدخول، حاول مرة تانية."
+    },
+    en: {
+      dir:"ltr", lang:"en",
+      brand:"Student Affairs — Faculty of Engineering",
+      toggle:"العربية",
+      heroTitle:"Every university competition, in one place",
+      heroSub:"Sign in with your university email and follow every announcement, deadline, and result as it happens.",
+      stat1:"active competitions", stat2:"departments", stat3:"push notifications", stat3v:"instant",
+      cardTitle:"Sign in",
+      cardHint:"Use your university Gmail to sign in or create your account.",
+      googleBtn:"Continue with university email",
+      divider:"First time here? Finish your profile",
+      lblDept:"Department", lblMajor:"Major", lblYear:"Academic year", lblSid:"Student ID",
+      footNote:"By continuing, you agree your university data is used to show competitions relevant to your department only.",
+      errDomain:"Sign-in is only allowed with a university email ending in @feng.bu.edu.eg — please use your university account.",
+      errGeneric:"Something went wrong while signing in. Please try again."
+    }
+  };
+
+  let current = "ar";
+
+  function applyLang(code){
+    const s = strings[code];
+    document.documentElement.setAttribute("dir", s.dir);
+    document.documentElement.setAttribute("lang", s.lang);
+    document.getElementById("brandText").textContent = s.brand;
+    document.getElementById("langToggle").textContent = s.toggle;
+    document.getElementById("heroTitle").textContent = s.heroTitle;
+    document.getElementById("heroSub").textContent = s.heroSub;
+    document.getElementById("cardTitle").textContent = s.cardTitle;
+    document.getElementById("cardHint").textContent = s.cardHint;
+    document.getElementById("googleBtnText").textContent = s.googleBtn;
+    document.getElementById("dividerText").textContent = s.divider;
+    document.getElementById("lblDept").textContent = s.lblDept;
+    document.getElementById("lblMajor").textContent = s.lblMajor;
+    document.getElementById("lblYear").textContent = s.lblYear;
+    document.getElementById("lblSid").textContent = s.lblSid;
+    document.getElementById("footNote").textContent = s.footNote;
+    const stat = document.querySelectorAll("#statStrip span");
+    stat[0].textContent = s.stat1; stat[1].textContent = s.stat2; stat[2].textContent = s.stat3;
+    document.querySelectorAll("#statStrip strong")[2].textContent = s.stat3v;
+    localStorage.setItem("uch_lang", code);
+  }
+
+  document.getElementById("langToggle").addEventListener("click", () => {
+    current = current === "ar" ? "en" : "ar";
+    applyLang(current);
+  });
+
+  // ---------- Auth error display ----------
+  function showAuthError(key) {
+    const el = document.getElementById("authError");
+    el.textContent = strings[current][key];
+    el.style.display = "block";
+  }
+  function hideAuthError() {
+    document.getElementById("authError").style.display = "none";
+  }
+
+  // ---------- One orchestrated entrance sequence ----------
+  window.addEventListener("DOMContentLoaded", () => {
+    const tl = gsap.timeline({ defaults:{ ease:"power3.out" } });
+    tl.to("#heroTitle", { opacity:1, y:0, duration:.6 }, 0.05)
+      .fromTo("#heroTitle", { y:16 }, { y:0, duration:.6 }, 0.05)
+      .fromTo("#heroSub", { y:14, opacity:0 }, { y:0, opacity:1, duration:.5 }, 0.18)
+      .fromTo("#statStrip", { y:12, opacity:0 }, { y:0, opacity:1, duration:.5 }, 0.28)
+      .fromTo("#loginCard", { y:22, opacity:0 }, { y:0, opacity:1, duration:.55 }, 0.15);
+  });
+
+  // Register service worker
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(console.error);
+    });
+  }
+</script>
+
+<!-- ============================================================
+     Firebase Auth — REAL domain restriction, not decorative.
+     Two independent checks, both required:
+       1) `hd` hint on the Google popup — nudges Google's account
+          picker to the university domain (UX only, NOT security,
+          a user can still pick another Google account).
+       2) Hard check on user.email after sign-in — anyone who is
+          not @feng.bu.edu.eg is signed out immediately and never
+          reaches the app or writes a Firestore user doc.
+     A third check MUST also exist server-side (already wired in
+     backend/app.py via ALLOWED_EMAIL_DOMAIN) — the client check
+     below can be bypassed by anyone editing the JS, so the backend
+     check is what actually protects your Firestore data.
+     ============================================================ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signOut
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // TODO: paste your real Firebase project config here
+  // (Firebase Console → Project settings → General → Your apps → Web app)
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const ALLOWED_DOMAIN = "feng.bu.edu.eg"; // <-- the only domain allowed to sign in
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const provider = new GoogleAuthProvider();
+  // Hints Google's account chooser toward the university domain (UX only).
+  provider.setCustomParameters({ hd: ALLOWED_DOMAIN });
+
+  document.getElementById("googleBtn").addEventListener("click", async () => {
+    hideAuthError();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      const email = (user.email || "").toLowerCase();
+
+      // Hard, non-negotiable check — this is the real gate.
+      if (!email.endsWith("@" + ALLOWED_DOMAIN)) {
+        await signOut(auth);
+        showAuthError("errDomain");
+        return;
+      }
+
+      const userRef = doc(db, "users", user.uid);
+      const existing = await getDoc(userRef);
+
+      if (!existing.exists()) {
+        // First-time login — save profile fields from the form below.
+        await setDoc(userRef, {
+          fullName: user.displayName,
+          universityEmail: email,
+          studentId: document.getElementById("studentId").value.trim(),
+          department: document.getElementById("dept").value,
+          major: document.getElementById("major").value,
+          academicYear: document.getElementById("year").value,
+          role: "student",
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      window.location.href = "home.html"; // main feed screen
+    } catch (err) {
+      console.error(err);
+      showAuthError("errGeneric");
+    }
+  });
+</script>
+</body>
+</html>
