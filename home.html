@@ -107,8 +107,9 @@
     transform:translateX(-105%); transition:transform .28s cubic-bezier(.22,.9,.35,1);
     display:flex; flex-direction:column; padding:22px 18px;
   }
-  html[dir="rtl"] .sidebar{ inset-inline-start:auto; inset-inline-end:0; transform:translateX(105%); }
-  .sidebar.open{ transform:translateX(0); }
+  html[dir="rtl"] .sidebar{ transform:translateX(105%); }
+  .sidebar.open,
+  html[dir="rtl"] .sidebar.open{ transform:translateX(0); }
 
   .profile-block{ display:flex; align-items:center; gap:12px; padding-bottom:18px; border-bottom:1px solid rgba(255,255,255,0.12); }
   .avatar{
