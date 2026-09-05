@@ -235,6 +235,82 @@
     .feed{ padding:24px; }
     .sidebar{ width:320px; }
   }
+
+  /* ---------- Registration modal ---------- */
+  .modal-scrim{
+    position:fixed; inset:0; background:rgba(13,23,39,0.5); display:none;
+    align-items:flex-end; justify-content:center; z-index:50;
+  }
+  .modal-scrim.show{ display:flex; }
+  .reg-modal{
+    background:var(--paper-raised); width:100%; max-width:560px; max-height:90vh; overflow-y:auto;
+    border-radius:18px 18px 0 0; padding:22px 20px 30px;
+  }
+  @media (min-width:640px){ .modal-scrim{ align-items:center; } .reg-modal{ border-radius:16px; } }
+  .reg-modal h2{ font-family:'Space Grotesk',sans-serif; font-size:17px; margin:0 0 4px; }
+  html[dir="rtl"] .reg-modal h2{ font-family:'Tajawal',sans-serif; }
+  .reg-modal .reg-sub{ font-size:13px; color:var(--ink-soft); margin:0 0 18px; line-height:1.6; }
+
+  .type-toggle{ display:flex; gap:8px; margin-bottom:16px; }
+  .type-toggle button{
+    flex:1; padding:11px; border-radius:10px; border:1px solid var(--line); background:var(--paper);
+    color:var(--ink-soft); font-size:13.5px; font-weight:600; cursor:pointer; transition:all .15s ease;
+  }
+  .type-toggle button.active{ background:var(--navy-900); border-color:var(--navy-900); color:#fff; }
+
+  .reg-field{ margin-bottom:14px; }
+  .reg-field label{ display:block; font-size:12.5px; font-weight:600; margin-bottom:6px; color:var(--ink); }
+  .reg-field label .opt{ font-weight:400; color:var(--ink-soft); }
+  .reg-field input, .reg-field textarea{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:#FAFBFC; font-size:13.5px;
+    font-family:inherit; color:var(--ink);
+  }
+  .reg-field textarea{ resize:vertical; min-height:64px; }
+  .reg-field input:focus, .reg-field textarea:focus{ outline:none; border-color:var(--navy-700); background:#fff; }
+
+  .members-block{ display:none; }
+  .members-block.show{ display:block; }
+  .member-row{ display:flex; gap:8px; margin-bottom:8px; }
+  .member-row input{ flex:1; padding:9px 10px; border-radius:8px; border:1px solid var(--line); font-size:13px; font-family:inherit; }
+  .member-row .rm-member{
+    flex:none; width:36px; border-radius:8px; border:1px solid var(--line); background:var(--coral-soft);
+    color:var(--coral); cursor:pointer; font-size:15px;
+  }
+  .add-member-btn{
+    width:100%; padding:9px; border-radius:8px; border:1px dashed var(--line); background:none;
+    color:var(--navy-700); font-size:12.5px; font-weight:600; cursor:pointer; margin-bottom:16px;
+  }
+
+  .reg-error{
+    display:none; padding:10px 12px; border-radius:9px; background:var(--coral-soft); border:1px solid #F0CFCB;
+    color:var(--coral); font-size:12.5px; line-height:1.6; margin-bottom:14px;
+  }
+  .reg-error.show{ display:block; }
+
+  .reg-actions{ display:flex; gap:10px; margin-top:6px; }
+  .reg-actions .btn-secondary{
+    flex:1; padding:12px; border-radius:10px; border:1px solid var(--line); background:none;
+    color:var(--ink); font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit;
+  }
+  .reg-actions .btn-submit{
+    flex:2; padding:12px; border-radius:10px; border:none; background:var(--navy-900); color:#fff;
+    font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+  .reg-actions .btn-submit:disabled{ opacity:.6; cursor:not-allowed; }
+
+  /* ---------- Registered state (post-submit) ---------- */
+  .registered-box{
+    background:var(--teal-soft); border:1px solid #C7E6DA; border-radius:12px; padding:14px 16px; margin-bottom:14px;
+  }
+  .registered-box strong{ display:block; font-size:13.5px; color:var(--teal); margin-bottom:2px; }
+  .registered-box span{ font-size:12.5px; color:var(--ink-soft); }
+
+  .cta-whatsapp{
+    display:flex; align-items:center; justify-content:center; gap:9px;
+    background:#25D366; color:#fff; text-decoration:none; padding:14px; border-radius:10px;
+    font-weight:700; font-size:14.5px; margin-bottom:10px;
+  }
+  .cta-whatsapp svg{ width:19px; height:19px; fill:#fff; flex:none; }
 </style>
 </head>
 <body>
@@ -329,6 +405,56 @@
     <div class="detail-body" id="detailBody"><!-- injected --></div>
   </div>
 
+  <!-- ---------- Registration modal (Apply now) ---------- -->
+  <div class="modal-scrim" id="regModalScrim">
+    <div class="reg-modal">
+      <h2 id="regModalTitle">بيانات التسجيل</h2>
+      <p class="reg-sub" id="regModalSub">املأ بياناتك عشان نقدر نتابع تسجيلك ونضمّك لجروب المسابقة.</p>
+
+      <p class="reg-error" id="regError"></p>
+
+      <div class="type-toggle">
+        <button type="button" class="active" data-type="individual" id="typeIndividualBtn">فردي</button>
+        <button type="button" data-type="team" id="typeTeamBtn">جماعي</button>
+      </div>
+
+      <form id="regForm">
+        <div class="reg-field">
+          <label id="lblLeaderName">اسم قائد الفريق</label>
+          <input type="text" id="regLeaderName" required>
+        </div>
+        <div class="reg-field">
+          <label id="lblLeaderPhone">رقم هاتف قائد الفريق</label>
+          <input type="tel" id="regLeaderPhone" required>
+        </div>
+        <div class="reg-field">
+          <label id="lblLeaderEmail">إيميل قائد الفريق</label>
+          <input type="email" id="regLeaderEmail" required>
+        </div>
+        <div class="reg-field">
+          <label><span id="lblSupervisorName">اسم مشرف المشروع</span> <span class="opt" id="lblOptional1">(إن وجد)</span></label>
+          <input type="text" id="regSupervisorName">
+        </div>
+
+        <div class="members-block" id="membersBlock">
+          <label id="lblTeamMembers" style="display:block;font-size:12.5px;font-weight:600;margin-bottom:8px;">أعضاء الفريق</label>
+          <div id="memberRows"></div>
+          <button type="button" class="add-member-btn" id="addMemberBtn">+ إضافة عضو</button>
+        </div>
+
+        <div class="reg-field">
+          <label><span id="lblNotes">ملاحظات إضافية</span> <span class="opt" id="lblOptional2">(إن وجد)</span></label>
+          <textarea id="regNotes"></textarea>
+        </div>
+
+        <div class="reg-actions">
+          <button type="button" class="btn-secondary" id="regCancelBtn">إلغاء</button>
+          <button type="submit" class="btn-submit" id="regSubmitBtn">تسجيل والمتابعة</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -359,6 +485,8 @@
   let competitions = [];
   let activeFilter = "all";
   let current = localStorage.getItem("uch_lang") || "ar";
+  let currentDetailId = null;
+  let regParticipationType = "individual";
 
   // Canonical value stays Arabic (so stored Firestore data never changes),
   // only the displayed label switches with the language.
@@ -536,8 +664,31 @@
     }
   }
 
+  // WhatsApp glyph reused for both the group-join CTA and the sidebar contacts.
+  const WA_ICON_SVG = `<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2zm5.7 14.2c-.2.6-1.4 1.2-1.9 1.2-.5.1-1.1.1-1.8-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1.1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5.2.6.7 1.9.8 2 .1.2.1.4 0 .6-.1.2-.2.3-.4.5-.2.2-.4.4-.5.6-.2.2-.4.4-.2.7.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.6 2.9 1.8.3.1.5.1.7-.1.2-.2.8-.9 1-1.2.2-.3.4-.3.7-.2.3.1 1.9.9 2.2 1.1.3.1.5.2.6.3.1.2.1.9-.1 1.5z"/></svg>`;
+
+  // Renders the CTA block for an OPEN competition: either "Apply now" (goes
+  // to the in-app registration form) or, once the current student has
+  // registered, the WhatsApp-group button + the original external link/form.
+  function renderApplyCta(c, isRegistered) {
+    if (!isRegistered) {
+      return `<button type="button" class="cta-link" id="ctaApplyBtn" style="width:100%;border:none;cursor:pointer;">${strings[current].applyNow}</button>`;
+    }
+    let html = `<div class="registered-box">
+      <strong>${strings[current].registeredTitle}</strong>
+      <span>${strings[current].registeredSub}</span>
+    </div>`;
+    if (c.whatsappGroupLink) {
+      html += `<a class="cta-whatsapp" href="${c.whatsappGroupLink}" target="_blank" rel="noopener">${WA_ICON_SVG}${strings[current].joinWhatsapp}</a>`;
+    }
+    if (c.link) {
+      html += `<a class="cta-secondary" id="ctaLink" href="${c.link}" target="_blank" rel="noopener">${strings[current].externalLinkLabel}</a>`;
+    }
+    return html;
+  }
+
   // ---------- Detail overlay ----------
-  function openDetail(id) {
+  async function openDetail(id) {
     const c = competitions.find(x => x.id === id);
     if (!c) return;
     logInteraction(id, "view");
@@ -561,10 +712,18 @@
       </div>`;
     }
 
-    let ctaHtml = "";
+    // Check whether the current student already submitted the in-app
+    // registration form for this competition (drives the funnel + admin
+    // follow-up table instead of an unverifiable external "submit").
+    let isRegistered = false;
     if (c.status === "open") {
-      ctaHtml = `<a class="cta-link" id="ctaLink" href="${c.link}" target="_blank" rel="noopener">${strings[current].applyNow}</a>`;
+      try {
+        const regSnap = await getDoc(doc(db, "competition_interactions", `${id}_${currentUser.uid}`));
+        isRegistered = regSnap.exists() && !!regSnap.data().formSubmittedAt;
+      } catch (e) { /* treat as not registered yet */ }
     }
+
+    const ctaHtml = c.status === "open" ? renderApplyCta(c, isRegistered) : "";
 
     body.innerHTML = `
       <span class="badge ${c.status}">${c.status === "open" ? strings[current].open : strings[current].closed}</span>
@@ -582,10 +741,107 @@
     const ctaLink = document.getElementById("ctaLink");
     if (ctaLink) ctaLink.addEventListener("click", () => logInteraction(id, "click"));
 
+    const ctaApplyBtn = document.getElementById("ctaApplyBtn");
+    if (ctaApplyBtn) ctaApplyBtn.addEventListener("click", () => openRegistrationModal(id));
+
     document.getElementById("detailOverlay").classList.add("open");
   }
   document.getElementById("closeDetailBtn").addEventListener("click", () => {
     document.getElementById("detailOverlay").classList.remove("open");
+  });
+
+  // ---------- Registration modal (Apply now) ----------
+  function setParticipationType(type) {
+    regParticipationType = type;
+    document.getElementById("typeIndividualBtn").classList.toggle("active", type === "individual");
+    document.getElementById("typeTeamBtn").classList.toggle("active", type === "team");
+    document.getElementById("membersBlock").classList.toggle("show", type === "team");
+    document.getElementById("lblLeaderName").textContent = type === "team" ? strings[current].lblLeaderName : strings[current].lblLeaderNameSolo;
+    document.getElementById("lblLeaderPhone").textContent = type === "team" ? strings[current].lblLeaderPhone : strings[current].lblLeaderPhoneSolo;
+    document.getElementById("lblLeaderEmail").textContent = type === "team" ? strings[current].lblLeaderEmail : strings[current].lblLeaderEmailSolo;
+    if (type === "team" && document.getElementById("memberRows").children.length === 0) addMemberRow();
+  }
+
+  function addMemberRow() {
+    const wrap = document.getElementById("memberRows");
+    const row = document.createElement("div");
+    row.className = "member-row";
+    row.innerHTML = `
+      <input type="text" class="member-name" placeholder="${strings[current].memberName}">
+      <input type="tel" class="member-phone" placeholder="${strings[current].memberPhone}">
+      <button type="button" class="rm-member">×</button>`;
+    row.querySelector(".rm-member").addEventListener("click", () => row.remove());
+    wrap.appendChild(row);
+  }
+  document.getElementById("addMemberBtn").addEventListener("click", addMemberRow);
+
+  function openRegistrationModal(competitionId) {
+    currentDetailId = competitionId;
+    document.getElementById("regForm").reset();
+    document.getElementById("memberRows").innerHTML = "";
+    document.getElementById("regError").classList.remove("show");
+    document.getElementById("regLeaderEmail").value = (currentUser && currentUser.email) || "";
+    if (userProfile && userProfile.fullName) document.getElementById("regLeaderName").value = userProfile.fullName;
+    setParticipationType("individual");
+    document.getElementById("regModalScrim").classList.add("show");
+  }
+  document.getElementById("typeIndividualBtn").addEventListener("click", () => setParticipationType("individual"));
+  document.getElementById("typeTeamBtn").addEventListener("click", () => setParticipationType("team"));
+  document.getElementById("regCancelBtn").addEventListener("click", () => {
+    document.getElementById("regModalScrim").classList.remove("show");
+  });
+
+  document.getElementById("regForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById("regError");
+    errEl.classList.remove("show");
+
+    const leaderName = document.getElementById("regLeaderName").value.trim();
+    const leaderPhone = document.getElementById("regLeaderPhone").value.trim();
+    const leaderEmail = document.getElementById("regLeaderEmail").value.trim();
+    const supervisorName = document.getElementById("regSupervisorName").value.trim();
+    const notes = document.getElementById("regNotes").value.trim();
+
+    if (!leaderName || !leaderPhone || !leaderEmail) {
+      errEl.textContent = strings[current].regRequiredError;
+      errEl.classList.add("show");
+      return;
+    }
+
+    let teamMembers = [];
+    if (regParticipationType === "team") {
+      document.querySelectorAll("#memberRows .member-row").forEach(row => {
+        const name = row.querySelector(".member-name").value.trim();
+        const phone = row.querySelector(".member-phone").value.trim();
+        if (name && phone) teamMembers.push({ name, phone });
+      });
+    }
+
+    const submitBtn = document.getElementById("regSubmitBtn");
+    submitBtn.disabled = true;
+    submitBtn.textContent = strings[current].regSubmitting;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/interactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${idToken}` },
+        body: JSON.stringify({
+          competitionId: currentDetailId,
+          event: "submit",
+          registration: { participationType: regParticipationType, leaderName, leaderPhone, leaderEmail, supervisorName, teamMembers, notes }
+        })
+      });
+      if (!res.ok) throw new Error("request failed");
+
+      document.getElementById("regModalScrim").classList.remove("show");
+      openDetail(currentDetailId); // re-render with the registered state (WhatsApp CTA)
+    } catch (err) {
+      errEl.textContent = strings[current].regGenericError;
+      errEl.classList.add("show");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = strings[current].regSubmit;
+    }
   });
 
   // ---------- Sidebar open/close ----------
@@ -611,7 +867,23 @@
       dept:"القسم", major:"التخصص", year:"الفرقة", save:"حفظ التعديلات", logout:"تسجيل الخروج",
       empty:"مفيش إعلانات دلوقتي، تابعنا أول بأول.",
       deadlinePrefix:"آخر موعد للتقديم:", ended:"المسابقة انتهت", yearPrefix:"الفرقة",
-      winnersTitle:"🏆 المراكز الفائزة", attachment:"مرفق المسابقة", openFile:"فتح", applyNow:"التقديم للمسابقة"
+      winnersTitle:"🏆 المراكز الفائزة", attachment:"مرفق المسابقة", openFile:"فتح", applyNow:"التقديم للمسابقة",
+      regModalTitle:"بيانات التسجيل",
+      regModalSub:"املأ بياناتك عشان نقدر نتابع تسجيلك ونضمّك لجروب المسابقة.",
+      typeIndividual:"فردي", typeTeam:"جماعي",
+      lblLeaderName:"اسم قائد الفريق", lblLeaderNameSolo:"الاسم",
+      lblLeaderPhone:"رقم هاتف قائد الفريق", lblLeaderPhoneSolo:"رقم الهاتف",
+      lblLeaderEmail:"إيميل قائد الفريق", lblLeaderEmailSolo:"الإيميل",
+      lblSupervisorName:"اسم مشرف المشروع", optional:"(إن وجد)",
+      lblTeamMembers:"أعضاء الفريق", memberName:"اسم العضو", memberPhone:"رقم الهاتف", addMember:"+ إضافة عضو",
+      lblNotes:"ملاحظات إضافية",
+      regCancel:"إلغاء", regSubmit:"تسجيل والمتابعة", regSubmitting:"جارِ التسجيل...",
+      regRequiredError:"من فضلك املأ الاسم ورقم الهاتف والإيميل.",
+      regGenericError:"حصل خطأ أثناء الحفظ، حاول تاني.",
+      registeredTitle:"تم تسجيلك في المسابقة ✅",
+      registeredSub:"بياناتك وصلت لفريق المتابعة.",
+      joinWhatsapp:"انضم لجروب المسابقة على واتساب",
+      externalLinkLabel:"رابط/فورم التقديم الرسمي"
     },
     en: {
       dir:"ltr", lang:"en", pageTitle:"Competition Announcements",
@@ -622,7 +894,23 @@
       dept:"Department", major:"Major", year:"Academic year", save:"Save changes", logout:"Sign out",
       empty:"No announcements yet — check back soon.",
       deadlinePrefix:"Deadline:", ended:"Competition ended", yearPrefix:"Year",
-      winnersTitle:"🏆 Winners", attachment:"Competition attachment", openFile:"Open", applyNow:"Apply now"
+      winnersTitle:"🏆 Winners", attachment:"Competition attachment", openFile:"Open", applyNow:"Apply now",
+      regModalTitle:"Registration details",
+      regModalSub:"Fill in your details so we can follow up on your registration and add you to the competition group.",
+      typeIndividual:"Individual", typeTeam:"Team",
+      lblLeaderName:"Team leader name", lblLeaderNameSolo:"Full name",
+      lblLeaderPhone:"Team leader phone", lblLeaderPhoneSolo:"Phone number",
+      lblLeaderEmail:"Team leader email", lblLeaderEmailSolo:"Email",
+      lblSupervisorName:"Project supervisor name", optional:"(if any)",
+      lblTeamMembers:"Team members", memberName:"Member name", memberPhone:"Phone number", addMember:"+ Add member",
+      lblNotes:"Additional notes",
+      regCancel:"Cancel", regSubmit:"Register & continue", regSubmitting:"Saving...",
+      regRequiredError:"Please fill in the name, phone number, and email.",
+      regGenericError:"Something went wrong while saving — please try again.",
+      registeredTitle:"You're registered ✅",
+      registeredSub:"Your details have reached the follow-up team.",
+      joinWhatsapp:"Join the competition WhatsApp group",
+      externalLinkLabel:"Official application link/form"
     }
   };
 
@@ -650,6 +938,28 @@
     translateSelect(document.getElementById("editDept"), DEPTS, code);
     translateSelect(document.getElementById("editMajor"), MAJORS, code);
     translateSelect(document.getElementById("editYear"), YEARS, code);
+
+    // ---- Registration modal ----
+    document.getElementById("regModalTitle").textContent = s.regModalTitle;
+    document.getElementById("regModalSub").textContent = s.regModalSub;
+    document.getElementById("typeIndividualBtn").textContent = s.typeIndividual;
+    document.getElementById("typeTeamBtn").textContent = s.typeTeam;
+    document.getElementById("lblLeaderName").textContent = regParticipationType === "team" ? s.lblLeaderName : s.lblLeaderNameSolo;
+    document.getElementById("lblLeaderPhone").textContent = regParticipationType === "team" ? s.lblLeaderPhone : s.lblLeaderPhoneSolo;
+    document.getElementById("lblLeaderEmail").textContent = regParticipationType === "team" ? s.lblLeaderEmail : s.lblLeaderEmailSolo;
+    document.getElementById("lblSupervisorName").textContent = s.lblSupervisorName;
+    document.getElementById("lblOptional1").textContent = s.optional;
+    document.getElementById("lblTeamMembers").textContent = s.lblTeamMembers;
+    document.getElementById("addMemberBtn").textContent = s.addMember;
+    document.getElementById("lblNotes").textContent = s.lblNotes;
+    document.getElementById("lblOptional2").textContent = s.optional;
+    document.getElementById("regCancelBtn").textContent = s.regCancel;
+    document.getElementById("regSubmitBtn").textContent = s.regSubmit;
+    document.querySelectorAll("#memberRows .member-row").forEach(row => {
+      row.querySelector(".member-name").placeholder = s.memberName;
+      row.querySelector(".member-phone").placeholder = s.memberPhone;
+    });
+
     localStorage.setItem("uch_lang", code);
     renderProfile();
     renderContacts();

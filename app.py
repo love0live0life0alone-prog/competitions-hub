@@ -6,7 +6,8 @@ Responsibilities:
 - Send push notifications via Firebase Cloud Messaging when a new
   competition is published (kept server-side so the FCM server key
   never reaches the browser)
-- Receive and store interaction events (view / click / submit / follow-up)
+- Receive and store interaction events (view / click / submit / follow-up),
+  including the in-app team registration form data sent on "submit"
 - Restrict admin-only routes
 
 Requires environment variables (set these in Railway, never commit them):
@@ -79,6 +80,7 @@ def create_competition():
         "link": data["link"],
         "attachmentUrl": data.get("attachmentUrl"),
         "attachmentName": data.get("attachmentName"),
+        "whatsappGroupLink": data.get("whatsappGroupLink"),
         "deadline": data["deadline"],
         "status": "open",
         "createdBy": decoded["uid"],
@@ -118,6 +120,40 @@ def log_interaction():
     }
     if event_type in field_map:
         update_payload[field_map[event_type]] = firestore.SERVER_TIMESTAMP
+
+    # "submit" carries the in-app registration form (team/leader/contact
+    # details) collected right after the student presses "Apply now" —
+    # this is what actually drives the funnel + admin follow-up table,
+    # instead of relying on an external form we have no visibility into.
+    if event_type == "submit":
+        registration = data.get("registration") or {}
+        participation_type = registration.get("participationType")
+        if participation_type not in ("individual", "team"):
+            return jsonify({"error": "invalid participationType"}), 400
+
+        leader_name = (registration.get("leaderName") or "").strip()
+        leader_phone = (registration.get("leaderPhone") or "").strip()
+        leader_email = (registration.get("leaderEmail") or "").strip()
+        if not leader_name or not leader_phone or not leader_email:
+            return jsonify({"error": "missing required registration fields"}), 400
+
+        team_members = []
+        if participation_type == "team":
+            for m in registration.get("teamMembers", []):
+                name = (m.get("name") or "").strip()
+                phone = (m.get("phone") or "").strip()
+                if name and phone:
+                    team_members.append({"name": name, "phone": phone})
+
+        update_payload.update({
+            "participationType": participation_type,
+            "leaderName": leader_name,
+            "leaderPhone": leader_phone,
+            "leaderEmail": leader_email,
+            "supervisorName": (registration.get("supervisorName") or "").strip() or None,
+            "teamMembers": team_members,
+            "notes": (registration.get("notes") or "").strip() or None,
+        })
 
     ref.set(update_payload, merge=True)
     return jsonify({"ok": True})

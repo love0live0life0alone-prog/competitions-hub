@@ -141,6 +141,13 @@
         <div class="field"><label>آخر موعد للتقديم (Deadline)</label><input type="datetime-local" id="fDeadline" required></div>
         <div class="field"><label>مرفق PDF/Word (رابط بعد الرفع على Firebase Storage)</label><input type="text" id="fAttachUrl" placeholder="https://..."></div>
         <div class="field"><label>اسم الملف المعروض</label><input type="text" id="fAttachName" placeholder="تفاصيل_المسابقة.pdf"></div>
+        <div class="field">
+          <label>لينك جروب الواتساب الخاص بالمسابقة (اختياري)</label>
+          <input type="text" id="fWhatsapp" placeholder="https://chat.whatsapp.com/xxxxxxxx">
+        </div>
+        <p style="font-size:12px;color:var(--ink-soft);margin:-10px 0 14px;line-height:1.6;">
+          بيظهر للطالب كزرار "انضم للجروب" فور ما يسجل بياناته في المسابقة — لو المسابقة محتاجة فورم خارجي (من جهة تانية)، ابعته على الجروب نفسه بعد ما الأعضاء ينضموا.
+        </p>
         <div class="row-between">
           <button type="button" class="btn secondary" id="cancelCompBtn">إلغاء</button>
           <button type="submit" class="btn" id="submitCompBtn">نشر المسابقة</button>
@@ -245,8 +252,20 @@
     const submitted = stats.raw.filter(d => d.formSubmittedAt);
     return Promise.all(submitted.map(async (d) => {
       const uSnap = await getDoc(doc(db, "users", d.studentId));
-      const name = uSnap.exists() ? uSnap.data().fullName : d.studentId;
-      return { studentId: d.studentId, name, followUpStatus: d.followUpStatus || "registered" };
+      // Fall back to the account holder's own name only for very old records
+      // saved before the in-app registration form existed.
+      const accountName = uSnap.exists() ? uSnap.data().fullName : d.studentId;
+      return {
+        studentId: d.studentId,
+        name: d.leaderName || accountName,
+        followUpStatus: d.followUpStatus || "registered",
+        participationType: d.participationType || null,
+        leaderPhone: d.leaderPhone || null,
+        leaderEmail: d.leaderEmail || null,
+        supervisorName: d.supervisorName || null,
+        teamMembers: d.teamMembers || [],
+        notes: d.notes || null,
+      };
     }));
   }
 
@@ -308,11 +327,30 @@
 
     panel.innerHTML = `
       <table class="students-table">
-        <thead><tr><th>الطالب</th><th>حالة المتابعة</th></tr></thead>
+        <thead><tr><th>القائد / الفريق</th><th>التواصل</th><th>حالة المتابعة</th></tr></thead>
         <tbody>
-          ${rows.map(r => `
+          ${rows.map(r => {
+            const typeLabel = r.participationType === "team" ? "🧑‍🤝‍🧑 فريق" : r.participationType === "individual" ? "🧑 فردي" : "";
+            const membersHtml = r.teamMembers && r.teamMembers.length
+              ? `<div style="margin-top:4px;font-size:11.5px;color:var(--ink-soft);">
+                   ${r.teamMembers.map(m => `${m.name} (${m.phone})`).join("<br>")}
+                 </div>`
+              : "";
+            const supervisorHtml = r.supervisorName
+              ? `<div style="margin-top:2px;font-size:11.5px;color:var(--ink-soft);">مشرف: ${r.supervisorName}</div>` : "";
+            const notesHtml = r.notes
+              ? `<div style="margin-top:2px;font-size:11.5px;color:var(--ink-soft);">ملاحظات: ${r.notes}</div>` : "";
+            const contactHtml = `
+              ${r.leaderPhone ? `<div>📞 ${r.leaderPhone}</div>` : ""}
+              ${r.leaderEmail ? `<div style="font-size:11.5px;color:var(--ink-soft);">${r.leaderEmail}</div>` : ""}`;
+            return `
             <tr>
-              <td>${r.name}</td>
+              <td>
+                <strong>${r.name}</strong>
+                ${typeLabel ? `<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${typeLabel}</div>` : ""}
+                ${membersHtml}${supervisorHtml}${notesHtml}
+              </td>
+              <td>${contactHtml}</td>
               <td>
                 <select data-comp="${competitionId}" data-student="${r.studentId}" class="follow-select">
                   <option value="registered" ${r.followUpStatus === "registered" ? "selected" : ""}>مسجّل</option>
@@ -321,7 +359,8 @@
                   <option value="dropped" ${r.followUpStatus === "dropped" ? "selected" : ""}>انسحب</option>
                 </select>
               </td>
-            </tr>`).join("")}
+            </tr>`;
+          }).join("")}
         </tbody>
       </table>`;
     panel.style.display = "block";
@@ -352,6 +391,7 @@
       deadline: document.getElementById("fDeadline").value,
       attachmentUrl: document.getElementById("fAttachUrl").value.trim() || null,
       attachmentName: document.getElementById("fAttachName").value.trim() || null,
+      whatsappGroupLink: document.getElementById("fWhatsapp").value.trim() || null,
     };
 
     // Publishing goes through the Flask API so the push-notification
