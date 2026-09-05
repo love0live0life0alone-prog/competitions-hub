@@ -116,9 +116,7 @@
   .avatar{
     width:46px; height:46px; border-radius:50%; background:var(--gold); color:var(--navy-950);
     display:flex; align-items:center; justify-content:center; font-weight:700; font-size:17px; flex:none;
-    overflow:hidden;
   }
-  .avatar img{ width:100%; height:100%; object-fit:cover; border-radius:50%; }
   .profile-block strong{ display:block; font-size:15px; font-family:'Space Grotesk',sans-serif; }
   html[dir="rtl"] .profile-block strong{ font-family:'Tajawal',sans-serif; }
   .profile-block span{ display:block; font-size:12px; color:rgba(255,255,255,0.55); margin-top:2px; }
@@ -136,10 +134,19 @@
 
   .edit-field{ margin-bottom:10px; }
   .edit-field label{ display:block; font-size:12px; color:rgba(255,255,255,0.55); margin-bottom:5px; }
-  .edit-field select{
-    width:100%; padding:9px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.18);
-    background:rgba(255,255,255,0.06); color:#fff; font-size:13.5px; font-family:inherit;
+  .edit-field input, .edit-field select{
+    width:100%; padding:9px 34px 9px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.18);
+    background:rgba(255,255,255,0.08); color:#fff; font-size:13.5px; font-family:inherit;
+    appearance:none; -webkit-appearance:none;
   }
+  html[dir="rtl"] .edit-field input, html[dir="rtl"] .edit-field select{ padding:9px 10px 9px 34px; }
+  .edit-field input::placeholder{ color:rgba(255,255,255,0.4); }
+  .edit-field select{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23FFFFFF' stroke-opacity='0.6' stroke-width='1.6' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 12px center;
+  }
+  html[dir="rtl"] .edit-field select{ background-position:left 12px center; }
   .edit-field select option{ color:#000; }
   .save-btn{
     width:100%; margin-top:6px; padding:10px; border-radius:8px; border:none;
@@ -269,10 +276,6 @@
         <input type="text" id="editFullName" placeholder="اكتب اسمك بالكامل">
       </div>
       <div class="edit-field">
-        <label id="lblPhoto">رابط الصورة الشخصية (اختياري)</label>
-        <input type="url" id="editPhotoUrl" placeholder="https://...">
-      </div>
-      <div class="edit-field">
         <label id="lblDept">القسم</label>
         <select id="editDept">
           <option value="هندسة الإنتاج">هندسة الإنتاج</option><option value="هندسة القوى الميكانيكية">هندسة القوى الميكانيكية</option>
@@ -393,13 +396,7 @@
     if (!userProfile) return;
     const displayName = userProfile.fullName || currentUser.email;
     document.getElementById("sideName").textContent = displayName;
-
-    const avatarEl = document.getElementById("avatarInitial");
-    if (userProfile.photoUrl) {
-      avatarEl.innerHTML = `<img src="${userProfile.photoUrl}" alt="">`;
-    } else {
-      avatarEl.textContent = displayName.trim().charAt(0);
-    }
+    document.getElementById("avatarInitial").textContent = displayName.trim().charAt(0);
 
     const deptLabel = translateValue(DEPTS, userProfile.department, current);
     const yearLabel = translateValue(YEARS, userProfile.academicYear, current);
@@ -407,7 +404,6 @@
       `${deptLabel} · ${strings[current].yearPrefix} ${yearLabel}`;
 
     document.getElementById("editFullName").value = userProfile.fullName || "";
-    document.getElementById("editPhotoUrl").value = userProfile.photoUrl || "";
     if (userProfile.department) document.getElementById("editDept").value = userProfile.department;
     if (userProfile.major) document.getElementById("editMajor").value = userProfile.major;
     if (userProfile.academicYear) document.getElementById("editYear").value = userProfile.academicYear;
@@ -417,7 +413,6 @@
   document.getElementById("saveProfileBtn").addEventListener("click", async () => {
     const updated = {
       fullName: document.getElementById("editFullName").value.trim() || currentUser.email.split("@")[0],
-      photoUrl: document.getElementById("editPhotoUrl").value.trim() || null,
       department: document.getElementById("editDept").value,
       major: document.getElementById("editMajor").value,
       academicYear: document.getElementById("editYear").value,
@@ -432,8 +427,8 @@
 
   // ---------- Contacts (youth-care staff) ----------
   const contacts = [
-    { name: "أ. محمد عبد الله", role_ar: "مسؤول رعاية الشباب", role_en: "Student Affairs Officer", phone: "20100XXXXXXX" },
-    { name: "أ. سارة حسن", role_ar: "منسقة المسابقات", role_en: "Competitions Coordinator", phone: "20101XXXXXXX" }
+    { name: "أ. محمد عبد الله", role_ar: "مسؤول رعاية الشباب", role_en: "Student Affairs Officer", phone: "201019461036" },
+    { name: "أ. سارة حسن", role_ar: "منسقة المسابقات", role_en: "Competitions Coordinator", phone: "201554677212" }
   ];
   function renderContacts() {
     const list = document.getElementById("contactList");
@@ -596,7 +591,7 @@
       dir:"rtl", lang:"ar", pageTitle:"إعلانات المسابقات",
       all:"الكل", open:"مسابقات مفتوحة", closed:"انتهت",
       lang_label:"اللغة", edit_label:"تعديل البيانات", contact_label:"تواصل معنا — رعاية الشباب",
-      fullName:"الاسم بالكامل", photo:"رابط الصورة الشخصية (اختياري)",
+      fullName:"الاسم بالكامل",
       dept:"القسم", major:"التخصص", year:"الفرقة", save:"حفظ التعديلات", logout:"تسجيل الخروج",
       empty:"مفيش إعلانات دلوقتي، تابعنا أول بأول.",
       deadlinePrefix:"آخر موعد للتقديم:", ended:"المسابقة انتهت", yearPrefix:"الفرقة",
@@ -606,7 +601,7 @@
       dir:"ltr", lang:"en", pageTitle:"Competition Announcements",
       all:"All", open:"Open", closed:"Closed",
       lang_label:"Language", edit_label:"Edit profile", contact_label:"Contact us — Student Affairs",
-      fullName:"Full name", photo:"Profile photo URL (optional)",
+      fullName:"Full name",
       dept:"Department", major:"Major", year:"Academic year", save:"Save changes", logout:"Sign out",
       empty:"No announcements yet — check back soon.",
       deadlinePrefix:"Deadline:", ended:"Competition ended", yearPrefix:"Year",
@@ -627,7 +622,6 @@
     document.getElementById("lblEdit").textContent = s.edit_label;
     document.getElementById("lblContact").textContent = s.contact_label;
     document.getElementById("lblFullName").textContent = s.fullName;
-    document.getElementById("lblPhoto").textContent = s.photo;
     document.getElementById("lblDept").textContent = s.dept;
     document.getElementById("lblMajor").textContent = s.major;
     document.getElementById("lblYear").textContent = s.year;
