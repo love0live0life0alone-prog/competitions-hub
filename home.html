@@ -106,6 +106,7 @@
     background:var(--navy-900); color:#fff; z-index:30;
     transform:translateX(-105%); transition:transform .28s cubic-bezier(.22,.9,.35,1);
     display:flex; flex-direction:column; padding:22px 18px;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
   }
   html[dir="rtl"] .sidebar{ transform:translateX(105%); }
   .sidebar.open,
@@ -115,7 +116,9 @@
   .avatar{
     width:46px; height:46px; border-radius:50%; background:var(--gold); color:var(--navy-950);
     display:flex; align-items:center; justify-content:center; font-weight:700; font-size:17px; flex:none;
+    overflow:hidden;
   }
+  .avatar img{ width:100%; height:100%; object-fit:cover; border-radius:50%; }
   .profile-block strong{ display:block; font-size:15px; font-family:'Space Grotesk',sans-serif; }
   html[dir="rtl"] .profile-block strong{ font-family:'Tajawal',sans-serif; }
   .profile-block span{ display:block; font-size:12px; color:rgba(255,255,255,0.55); margin-top:2px; }
@@ -262,22 +265,30 @@
     <div class="side-section">
       <p class="side-label" id="lblEdit">تعديل البيانات</p>
       <div class="edit-field">
+        <label id="lblFullName">الاسم بالكامل</label>
+        <input type="text" id="editFullName" placeholder="اكتب اسمك بالكامل">
+      </div>
+      <div class="edit-field">
+        <label id="lblPhoto">رابط الصورة الشخصية (اختياري)</label>
+        <input type="url" id="editPhotoUrl" placeholder="https://...">
+      </div>
+      <div class="edit-field">
         <label id="lblDept">القسم</label>
         <select id="editDept">
-          <option>هندسة الإنتاج</option><option>هندسة القوى الميكانيكية</option>
-          <option>هندسة الحاسبات</option><option>الهندسة الكهربية</option>
+          <option value="هندسة الإنتاج">هندسة الإنتاج</option><option value="هندسة القوى الميكانيكية">هندسة القوى الميكانيكية</option>
+          <option value="هندسة الحاسبات">هندسة الحاسبات</option><option value="الهندسة الكهربية">الهندسة الكهربية</option>
         </select>
       </div>
       <div class="edit-field">
         <label id="lblMajor">التخصص</label>
         <select id="editMajor">
-          <option>عام</option><option>تصنيع</option><option>تصميم ميكانيكي</option>
+          <option value="عام">عام</option><option value="تصنيع">تصنيع</option><option value="تصميم ميكانيكي">تصميم ميكانيكي</option>
         </select>
       </div>
       <div class="edit-field">
         <label id="lblYear">الفرقة</label>
         <select id="editYear">
-          <option>الأولى</option><option>الثانية</option><option>الثالثة</option><option>الرابعة</option>
+          <option value="الأولى">الأولى</option><option value="الثانية">الثانية</option><option value="الثالثة">الثالثة</option><option value="الرابعة">الرابعة</option>
         </select>
       </div>
       <button class="save-btn" id="saveProfileBtn">حفظ التعديلات</button>
@@ -333,6 +344,36 @@
   let activeFilter = "all";
   let current = localStorage.getItem("uch_lang") || "ar";
 
+  // Canonical value stays Arabic (so stored Firestore data never changes),
+  // only the displayed label switches with the language.
+  const DEPTS = [
+    { value:"هندسة الإنتاج", ar:"هندسة الإنتاج", en:"Production Engineering" },
+    { value:"هندسة القوى الميكانيكية", ar:"هندسة القوى الميكانيكية", en:"Mechanical Power Engineering" },
+    { value:"هندسة الحاسبات", ar:"هندسة الحاسبات", en:"Computer Engineering" },
+    { value:"الهندسة الكهربية", ar:"الهندسة الكهربية", en:"Electrical Engineering" }
+  ];
+  const MAJORS = [
+    { value:"عام", ar:"عام", en:"General" },
+    { value:"تصنيع", ar:"تصنيع", en:"Manufacturing" },
+    { value:"تصميم ميكانيكي", ar:"تصميم ميكانيكي", en:"Mechanical Design" }
+  ];
+  const YEARS = [
+    { value:"الأولى", ar:"الأولى", en:"1st Year" },
+    { value:"الثانية", ar:"الثانية", en:"2nd Year" },
+    { value:"الثالثة", ar:"الثالثة", en:"3rd Year" },
+    { value:"الرابعة", ar:"الرابعة", en:"4th Year" }
+  ];
+
+  function translateSelect(selectEl, list, lang){
+    const prev = selectEl.value;
+    selectEl.innerHTML = list.map(item => `<option value="${item.value}">${item[lang]}</option>`).join("");
+    if (prev) selectEl.value = prev;
+  }
+  function translateValue(list, arValue, lang){
+    const found = list.find(item => item.value === arValue);
+    return found ? found[lang] : (arValue || "");
+  }
+
   // ---------- Auth guard ----------
   onAuthStateChanged(auth, async (user) => {
     if (!user || !(user.email || "").toLowerCase().endsWith("@" + ALLOWED_DOMAIN) || !user.emailVerified) {
@@ -350,27 +391,39 @@
 
   function renderProfile() {
     if (!userProfile) return;
-    document.getElementById("sideName").textContent = userProfile.fullName || currentUser.email;
-    document.getElementById("avatarInitial").textContent = (userProfile.fullName || "?").trim().charAt(0);
+    const displayName = userProfile.fullName || currentUser.email;
+    document.getElementById("sideName").textContent = displayName;
+
+    const avatarEl = document.getElementById("avatarInitial");
+    if (userProfile.photoUrl) {
+      avatarEl.innerHTML = `<img src="${userProfile.photoUrl}" alt="">`;
+    } else {
+      avatarEl.textContent = displayName.trim().charAt(0);
+    }
+
+    const deptLabel = translateValue(DEPTS, userProfile.department, current);
+    const yearLabel = translateValue(YEARS, userProfile.academicYear, current);
     document.getElementById("sideMeta").textContent =
-      `${userProfile.department || ""} · ${strings[current].yearPrefix} ${userProfile.academicYear || ""}`;
+      `${deptLabel} · ${strings[current].yearPrefix} ${yearLabel}`;
+
+    document.getElementById("editFullName").value = userProfile.fullName || "";
+    document.getElementById("editPhotoUrl").value = userProfile.photoUrl || "";
     if (userProfile.department) document.getElementById("editDept").value = userProfile.department;
     if (userProfile.major) document.getElementById("editMajor").value = userProfile.major;
     if (userProfile.academicYear) document.getElementById("editYear").value = userProfile.academicYear;
   }
 
-  // ---------- Save profile edits (department/major/year only) ----------
+  // ---------- Save profile edits ----------
   document.getElementById("saveProfileBtn").addEventListener("click", async () => {
-    await setDoc(doc(db, "users", currentUser.uid), {
+    const updated = {
+      fullName: document.getElementById("editFullName").value.trim() || currentUser.email.split("@")[0],
+      photoUrl: document.getElementById("editPhotoUrl").value.trim() || null,
       department: document.getElementById("editDept").value,
       major: document.getElementById("editMajor").value,
       academicYear: document.getElementById("editYear").value,
-    }, { merge: true });
-    userProfile = { ...userProfile,
-      department: document.getElementById("editDept").value,
-      major: document.getElementById("editMajor").value,
-      academicYear: document.getElementById("editYear").value
     };
+    await setDoc(doc(db, "users", currentUser.uid), updated, { merge: true });
+    userProfile = { ...userProfile, ...updated };
     renderProfile();
     closeSidebar();
   });
@@ -379,15 +432,15 @@
 
   // ---------- Contacts (youth-care staff) ----------
   const contacts = [
-    { name: "أ. محمد عبد الله", role: "مسؤول رعاية الشباب", phone: "20100XXXXXXX" },
-    { name: "أ. سارة حسن", role: "منسقة المسابقات", phone: "20101XXXXXXX" }
+    { name: "أ. محمد عبد الله", role_ar: "مسؤول رعاية الشباب", role_en: "Student Affairs Officer", phone: "20100XXXXXXX" },
+    { name: "أ. سارة حسن", role_ar: "منسقة المسابقات", role_en: "Competitions Coordinator", phone: "20101XXXXXXX" }
   ];
   function renderContacts() {
     const list = document.getElementById("contactList");
     list.innerHTML = contacts.map(c => `
       <a class="contact-row" href="https://wa.me/${c.phone}" target="_blank" rel="noopener">
         <span class="wa-icon"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2zm5.7 14.2c-.2.6-1.4 1.2-1.9 1.2-.5.1-1.1.1-1.8-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1.1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5.2.6.7 1.9.8 2 .1.2.1.4 0 .6-.1.2-.2.3-.4.5-.2.2-.4.4-.5.6-.2.2-.4.4-.2.7.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.6 2.9 1.8.3.1.5.1.7-.1.2-.2.8-.9 1-1.2.2-.3.4-.3.7-.2.3.1 1.9.9 2.2 1.1.3.1.5.2.6.3.1.2.1.9-.1 1.5z"/></svg></span>
-        <div><strong>${c.name}</strong><span>${c.role}</span></div>
+        <div><strong>${c.name}</strong><span>${current === "ar" ? c.role_ar : c.role_en}</span></div>
       </a>`).join("");
   }
   renderContacts();
@@ -543,6 +596,7 @@
       dir:"rtl", lang:"ar", pageTitle:"إعلانات المسابقات",
       all:"الكل", open:"مسابقات مفتوحة", closed:"انتهت",
       lang_label:"اللغة", edit_label:"تعديل البيانات", contact_label:"تواصل معنا — رعاية الشباب",
+      fullName:"الاسم بالكامل", photo:"رابط الصورة الشخصية (اختياري)",
       dept:"القسم", major:"التخصص", year:"الفرقة", save:"حفظ التعديلات", logout:"تسجيل الخروج",
       empty:"مفيش إعلانات دلوقتي، تابعنا أول بأول.",
       deadlinePrefix:"آخر موعد للتقديم:", ended:"المسابقة انتهت", yearPrefix:"الفرقة",
@@ -552,6 +606,7 @@
       dir:"ltr", lang:"en", pageTitle:"Competition Announcements",
       all:"All", open:"Open", closed:"Closed",
       lang_label:"Language", edit_label:"Edit profile", contact_label:"Contact us — Student Affairs",
+      fullName:"Full name", photo:"Profile photo URL (optional)",
       dept:"Department", major:"Major", year:"Academic year", save:"Save changes", logout:"Sign out",
       empty:"No announcements yet — check back soon.",
       deadlinePrefix:"Deadline:", ended:"Competition ended", yearPrefix:"Year",
@@ -571,6 +626,8 @@
     document.getElementById("lblLang").textContent = s.lang_label;
     document.getElementById("lblEdit").textContent = s.edit_label;
     document.getElementById("lblContact").textContent = s.contact_label;
+    document.getElementById("lblFullName").textContent = s.fullName;
+    document.getElementById("lblPhoto").textContent = s.photo;
     document.getElementById("lblDept").textContent = s.dept;
     document.getElementById("lblMajor").textContent = s.major;
     document.getElementById("lblYear").textContent = s.year;
@@ -578,8 +635,12 @@
     document.getElementById("logoutBtn").textContent = s.logout;
     document.getElementById("btnAr").classList.toggle("active", code === "ar");
     document.getElementById("btnEn").classList.toggle("active", code === "en");
+    translateSelect(document.getElementById("editDept"), DEPTS, code);
+    translateSelect(document.getElementById("editMajor"), MAJORS, code);
+    translateSelect(document.getElementById("editYear"), YEARS, code);
     localStorage.setItem("uch_lang", code);
     renderProfile();
+    renderContacts();
     renderFeed();
   }
   document.getElementById("btnAr").addEventListener("click", () => applyLang("ar"));

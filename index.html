@@ -339,30 +339,34 @@
         </div>
 
         <div class="field">
+          <label id="lblFullName">الاسم بالكامل</label>
+          <input type="text" id="signupFullName" placeholder="الاسم اللي هيظهر في التطبيق" required>
+        </div>
+        <div class="field">
           <label id="lblDept">القسم</label>
           <select id="dept">
-            <option>هندسة الإنتاج</option>
-            <option>هندسة القوى الميكانيكية</option>
-            <option>هندسة الحاسبات</option>
-            <option>الهندسة الكهربية</option>
+            <option value="هندسة الإنتاج">هندسة الإنتاج</option>
+            <option value="هندسة القوى الميكانيكية">هندسة القوى الميكانيكية</option>
+            <option value="هندسة الحاسبات">هندسة الحاسبات</option>
+            <option value="الهندسة الكهربية">الهندسة الكهربية</option>
           </select>
         </div>
         <div class="field row2">
           <div>
             <label id="lblMajor">التخصص</label>
             <select id="major">
-              <option>عام</option>
-              <option>تصنيع</option>
-              <option>تصميم ميكانيكي</option>
+              <option value="عام">عام</option>
+              <option value="تصنيع">تصنيع</option>
+              <option value="تصميم ميكانيكي">تصميم ميكانيكي</option>
             </select>
           </div>
           <div>
             <label id="lblYear">الفرقة</label>
             <select id="year">
-              <option>الأولى</option>
-              <option>الثانية</option>
-              <option>الثالثة</option>
-              <option>الرابعة</option>
+              <option value="الأولى">الأولى</option>
+              <option value="الثانية">الثانية</option>
+              <option value="الثالثة">الثالثة</option>
+              <option value="الرابعة">الرابعة</option>
             </select>
           </div>
         </div>
@@ -393,9 +397,11 @@
       tabSignin:"عندي حساب", tabSignup:"حساب جديد",
       lblEmailIn:"الإيميل الجامعي", lblPassIn:"كلمة المرور", signinBtn:"تسجيل الدخول", forgotBtn:"نسيت كلمة المرور؟",
       lblEmailUp:"الإيميل الجامعي", lblPassUp:"كلمة المرور", lblPassConfirm:"تأكيد كلمة المرور", signupBtn:"إنشاء الحساب",
+      lblFullName:"الاسم بالكامل",
       lblDept:"القسم", lblMajor:"التخصص", lblYear:"الفرقة", lblSid:"الرقم الجامعي",
       footNote:"بالمتابعة أنت توافق على استخدام بياناتك الجامعية لعرض المسابقات المناسبة لقسمك فقط.",
       errDomain:"التسجيل متاح فقط بإيميل الجامعة الذي ينتهي بـ @feng.bu.edu.eg",
+      errFullName:"من فضلك اكتب اسمك بالكامل.",
       errGeneric:"حصل خطأ، حاول مرة تانية.",
       errPasswordMismatch:"كلمتا المرور مش متطابقتين.",
       errWeakPassword:"كلمة المرور لازم تكون 6 حروف/أرقام على الأقل.",
@@ -420,9 +426,11 @@
       tabSignin:"I have an account", tabSignup:"New account",
       lblEmailIn:"University email", lblPassIn:"Password", signinBtn:"Sign in", forgotBtn:"Forgot password?",
       lblEmailUp:"University email", lblPassUp:"Password", lblPassConfirm:"Confirm password", signupBtn:"Create account",
+      lblFullName:"Full name",
       lblDept:"Department", lblMajor:"Major", lblYear:"Academic year", lblSid:"Student ID",
       footNote:"By continuing, you agree your university data is used to show competitions relevant to your department only.",
       errDomain:"Sign-up is only allowed with a university email ending in @feng.bu.edu.eg",
+      errFullName:"Please enter your full name.",
       errGeneric:"Something went wrong. Please try again.",
       errPasswordMismatch:"Passwords don't match.",
       errWeakPassword:"Password must be at least 6 characters.",
@@ -436,6 +444,32 @@
       resetSent:"A password reset link has been sent to your email."
     }
   };
+
+  // Canonical value stays Arabic (so stored/Firestore data never changes),
+  // only the displayed label switches with the language.
+  const DEPTS = [
+    { value:"هندسة الإنتاج", ar:"هندسة الإنتاج", en:"Production Engineering" },
+    { value:"هندسة القوى الميكانيكية", ar:"هندسة القوى الميكانيكية", en:"Mechanical Power Engineering" },
+    { value:"هندسة الحاسبات", ar:"هندسة الحاسبات", en:"Computer Engineering" },
+    { value:"الهندسة الكهربية", ar:"الهندسة الكهربية", en:"Electrical Engineering" }
+  ];
+  const MAJORS = [
+    { value:"عام", ar:"عام", en:"General" },
+    { value:"تصنيع", ar:"تصنيع", en:"Manufacturing" },
+    { value:"تصميم ميكانيكي", ar:"تصميم ميكانيكي", en:"Mechanical Design" }
+  ];
+  const YEARS = [
+    { value:"الأولى", ar:"الأولى", en:"1st Year" },
+    { value:"الثانية", ar:"الثانية", en:"2nd Year" },
+    { value:"الثالثة", ar:"الثالثة", en:"3rd Year" },
+    { value:"الرابعة", ar:"الرابعة", en:"4th Year" }
+  ];
+
+  function translateSelect(selectEl, list, lang){
+    const prev = selectEl.value;
+    selectEl.innerHTML = list.map(item => `<option value="${item.value}">${item[lang]}</option>`).join("");
+    if (prev) selectEl.value = prev;
+  }
 
   let current = "ar";
 
@@ -460,6 +494,7 @@
     document.getElementById("lblPassUp").textContent = s.lblPassUp;
     document.getElementById("lblPassConfirm").textContent = s.lblPassConfirm;
     document.getElementById("signupBtn").textContent = s.signupBtn;
+    document.getElementById("lblFullName").textContent = s.lblFullName;
     document.getElementById("lblDept").textContent = s.lblDept;
     document.getElementById("lblMajor").textContent = s.lblMajor;
     document.getElementById("lblYear").textContent = s.lblYear;
@@ -468,12 +503,19 @@
     const stat = document.querySelectorAll("#statStrip span");
     stat[0].textContent = s.stat1; stat[1].textContent = s.stat2; stat[2].textContent = s.stat3;
     document.querySelectorAll("#statStrip strong")[2].textContent = s.stat3v;
+    translateSelect(document.getElementById("dept"), DEPTS, code);
+    translateSelect(document.getElementById("major"), MAJORS, code);
+    translateSelect(document.getElementById("year"), YEARS, code);
     localStorage.setItem("uch_lang", code);
   }
 
   document.getElementById("langToggle").addEventListener("click", () => {
     applyLang(current === "ar" ? "en" : "ar");
   });
+
+  // Keep whichever language the person last chose (on this page or home.html).
+  const savedLang = localStorage.getItem("uch_lang");
+  if (savedLang && savedLang !== current) applyLang(savedLang);
 
   // ---------- Tabs ----------
   document.getElementById("tabSignin").addEventListener("click", () => switchTab("signin"));
@@ -596,8 +638,10 @@
     const email = document.getElementById("signupEmail").value.trim();
     const password = document.getElementById("signupPassword").value;
     const confirm = document.getElementById("signupPasswordConfirm").value;
+    const fullName = document.getElementById("signupFullName").value.trim();
 
     if (!isAllowedEmail(email)) { showAuthError(strings[current].errDomain); return; }
+    if (!fullName) { showAuthError(strings[current].errFullName); return; }
     if (password !== confirm) { showAuthError(strings[current].errPasswordMismatch); return; }
     if (password.length < 6) { showAuthError(strings[current].errWeakPassword); return; }
 
@@ -607,7 +651,7 @@
 
       await setDoc(doc(db, "users", user.uid), {
         universityEmail: email.toLowerCase(),
-        fullName: email.split("@")[0],
+        fullName: fullName,
         studentId: document.getElementById("studentId").value.trim(),
         department: document.getElementById("dept").value,
         major: document.getElementById("major").value,
