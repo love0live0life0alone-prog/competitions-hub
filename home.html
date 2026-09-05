@@ -121,6 +121,14 @@
   html[dir="rtl"] .profile-block strong{ font-family:'Tajawal',sans-serif; }
   .profile-block span{ display:block; font-size:12px; color:rgba(255,255,255,0.55); margin-top:2px; }
 
+  .admin-link{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    margin:14px 0; padding:11px 14px; border-radius:10px;
+    background:var(--gold); color:var(--navy-950); text-decoration:none;
+    font-size:13.5px; font-weight:800;
+  }
+  html[dir="rtl"] .admin-link svg{ transform:scaleX(-1); }
+
   .side-section{ padding:18px 0; border-bottom:1px solid rgba(255,255,255,0.10); }
   .side-section:last-child{ border-bottom:none; }
   .side-label{ font-size:12px; color:rgba(255,255,255,0.45); margin:0 0 10px; }
@@ -260,6 +268,11 @@
         <span id="sideMeta">—</span>
       </div>
     </div>
+
+    <a href="admin.html" class="admin-link" id="adminLink" style="display:none;">
+      <span id="lblAdminLink">لوحة تحكم المسؤولين</span>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+    </a>
 
     <div class="side-section">
       <p class="side-label" id="lblLang">اللغة</p>
@@ -407,6 +420,8 @@
     if (userProfile.department) document.getElementById("editDept").value = userProfile.department;
     if (userProfile.major) document.getElementById("editMajor").value = userProfile.major;
     if (userProfile.academicYear) document.getElementById("editYear").value = userProfile.academicYear;
+
+    document.getElementById("adminLink").style.display = userProfile.role === "admin" ? "flex" : "none";
   }
 
   // ---------- Save profile edits ----------
@@ -592,6 +607,7 @@
       all:"الكل", open:"مسابقات مفتوحة", closed:"انتهت",
       lang_label:"اللغة", edit_label:"تعديل البيانات", contact_label:"تواصل معنا — رعاية الشباب",
       fullName:"الاسم بالكامل",
+      adminLink:"لوحة تحكم المسؤولين",
       dept:"القسم", major:"التخصص", year:"الفرقة", save:"حفظ التعديلات", logout:"تسجيل الخروج",
       empty:"مفيش إعلانات دلوقتي، تابعنا أول بأول.",
       deadlinePrefix:"آخر موعد للتقديم:", ended:"المسابقة انتهت", yearPrefix:"الفرقة",
@@ -602,6 +618,7 @@
       all:"All", open:"Open", closed:"Closed",
       lang_label:"Language", edit_label:"Edit profile", contact_label:"Contact us — Student Affairs",
       fullName:"Full name",
+      adminLink:"Admin Dashboard",
       dept:"Department", major:"Major", year:"Academic year", save:"Save changes", logout:"Sign out",
       empty:"No announcements yet — check back soon.",
       deadlinePrefix:"Deadline:", ended:"Competition ended", yearPrefix:"Year",
@@ -622,6 +639,7 @@
     document.getElementById("lblEdit").textContent = s.edit_label;
     document.getElementById("lblContact").textContent = s.contact_label;
     document.getElementById("lblFullName").textContent = s.fullName;
+    document.getElementById("lblAdminLink").textContent = s.adminLink;
     document.getElementById("lblDept").textContent = s.dept;
     document.getElementById("lblMajor").textContent = s.major;
     document.getElementById("lblYear").textContent = s.year;
