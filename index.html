@@ -224,6 +224,24 @@
   .id-fields{ display:none; }
   .id-fields.show{ display:block; }
 
+  .auth-tabs{ display:flex; gap:6px; margin-bottom:20px; background:var(--paper); border-radius:10px; padding:4px; }
+  .auth-tab{
+    flex:1; text-align:center; padding:9px; border-radius:8px; font-size:13.5px; font-weight:600;
+    color:var(--ink-soft); cursor:pointer; border:none; background:none; font-family:inherit;
+  }
+  .auth-tab.active{ background:var(--paper-raised); color:var(--navy-900); box-shadow:0 2px 6px rgba(13,23,39,0.08); }
+  .auth-form{ display:none; }
+  .auth-form.active{ display:block; }
+  .link-btn{
+    background:none; border:none; color:var(--navy-700); font-size:12.5px; font-weight:600;
+    cursor:pointer; padding:0; font-family:inherit; text-decoration:underline;
+  }
+  .success-box{
+    display:none; padding:14px; border-radius:10px; background:#E9F5EF; border:1px solid #BFE3D0;
+    color:#1F6B49; font-size:13px; line-height:1.7; margin-top:6px;
+  }
+  .success-box.show{ display:block; }
+
   .foot-note{
     text-align:center;
     font-size:12.5px;
@@ -277,18 +295,49 @@
   <section class="panel">
     <div class="card" data-anim id="loginCard">
       <h2 id="cardTitle">تسجيل الدخول</h2>
-      <p class="hint" id="cardHint">استخدم إيميلك الجامعي (Gmail) للدخول أو إنشاء حسابك.</p>
+      <p class="hint" id="cardHint">استخدم إيميلك الجامعي (الينتهي بـ feng.bu.edu.eg@) للدخول أو إنشاء حسابك.</p>
 
-      <button class="btn-primary" id="googleBtn" type="button">
-        <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.5 29.6 3.5 24 3.5 12.7 3.5 3.5 12.7 3.5 24S12.7 44.5 24 44.5 44.5 35.3 44.5 24c0-1.2-.1-2.4-.3-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.9 19 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 5.5 29.6 3.5 24 3.5c-7.7 0-14.3 4.4-17.7 11.2z"/><path fill="#4CAF50" d="M24 44.5c5.5 0 10.4-1.9 14-5l-6.5-5.4c-2 1.4-4.6 2.4-7.5 2.4-5.3 0-9.7-3.4-11.3-8.1l-6.6 5.1C9.6 40 16.3 44.5 24 44.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.4-2.4 4.4-4.5 5.7l6.5 5.4C41.4 35.5 44.5 30.2 44.5 24c0-1.2-.1-2.4-.3-3.5z"/></svg>
-        <span id="googleBtnText">الدخول بإيميل الجامعة</span>
-      </button>
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="signin" id="tabSignin">عندي حساب</button>
+        <button class="auth-tab" data-tab="signup" id="tabSignup">حساب جديد</button>
+      </div>
 
-      <p id="authError" role="alert" style="display:none; margin:12px 0 0; padding:11px 14px; border-radius:10px; background:#FBEAEA; border:1px solid #EFC6C6; color:#A5342C; font-size:13px; line-height:1.6;"></p>
+      <p id="authError" role="alert" style="display:none; margin:0 0 14px; padding:11px 14px; border-radius:10px; background:#FBEAEA; border:1px solid #EFC6C6; color:#A5342C; font-size:13px; line-height:1.6;"></p>
+      <div id="successBox" class="success-box"></div>
 
-      <div class="divider"><span id="dividerText">أول مرة تدخل؟ كمّل بياناتك</span></div>
+      <!-- ---------- Sign in ---------- -->
+      <form id="signinForm" class="auth-form active">
+        <div class="field">
+          <label id="lblEmailIn">الإيميل الجامعي</label>
+          <input type="email" id="signinEmail" placeholder="ID@feng.bu.edu.eg" required>
+        </div>
+        <div class="field">
+          <label id="lblPassIn">كلمة المرور</label>
+          <input type="password" id="signinPassword" required>
+        </div>
+        <button class="btn-primary" type="submit" id="signinBtn">تسجيل الدخول</button>
+        <p style="text-align:center;margin-top:12px;">
+          <button type="button" class="link-btn" id="forgotBtn">نسيت كلمة المرور؟</button>
+        </p>
+      </form>
 
-      <form id="profileForm">
+      <!-- ---------- Sign up ---------- -->
+      <form id="signupForm" class="auth-form">
+        <div class="field">
+          <label id="lblEmailUp">الإيميل الجامعي</label>
+          <input type="email" id="signupEmail" placeholder="ID@feng.bu.edu.eg" required>
+        </div>
+        <div class="field row2">
+          <div>
+            <label id="lblPassUp">كلمة المرور</label>
+            <input type="password" id="signupPassword" minlength="6" required>
+          </div>
+          <div>
+            <label id="lblPassConfirm">تأكيد كلمة المرور</label>
+            <input type="password" id="signupPasswordConfirm" minlength="6" required>
+          </div>
+        </div>
+
         <div class="field">
           <label id="lblDept">القسم</label>
           <select id="dept">
@@ -319,8 +368,10 @@
         </div>
         <div class="field">
           <label id="lblSid">الرقم الجامعي</label>
-          <input type="text" id="studentId" placeholder="مثال: 2021123456" inputmode="numeric">
+          <input type="text" id="studentId" placeholder="مثال: 2021123456" inputmode="numeric" required>
         </div>
+
+        <button class="btn-primary" type="submit" id="signupBtn">إنشاء الحساب</button>
       </form>
 
       <p class="foot-note" id="footNote">بالمتابعة أنت توافق على استخدام بياناتك الجامعية لعرض المسابقات المناسبة لقسمك فقط.</p>
@@ -338,13 +389,24 @@
       heroSub:"سجّل بإيميلك الجامعي، وتابع كل الإعلانات ومواعيد التقديم والنتائج أول بأول.",
       stat1:"مسابقة نشطة", stat2:"أقسام", stat3:"إشعارات فورية", stat3v:"لحظي",
       cardTitle:"تسجيل الدخول",
-      cardHint:"استخدم إيميلك الجامعي (Gmail) للدخول أو إنشاء حسابك.",
-      googleBtn:"الدخول بإيميل الجامعة",
-      divider:"أول مرة تدخل؟ كمّل بياناتك",
+      cardHint:"استخدم إيميلك الجامعي (الينتهي بـ feng.bu.edu.eg@) للدخول أو إنشاء حسابك.",
+      tabSignin:"عندي حساب", tabSignup:"حساب جديد",
+      lblEmailIn:"الإيميل الجامعي", lblPassIn:"كلمة المرور", signinBtn:"تسجيل الدخول", forgotBtn:"نسيت كلمة المرور؟",
+      lblEmailUp:"الإيميل الجامعي", lblPassUp:"كلمة المرور", lblPassConfirm:"تأكيد كلمة المرور", signupBtn:"إنشاء الحساب",
       lblDept:"القسم", lblMajor:"التخصص", lblYear:"الفرقة", lblSid:"الرقم الجامعي",
       footNote:"بالمتابعة أنت توافق على استخدام بياناتك الجامعية لعرض المسابقات المناسبة لقسمك فقط.",
-      errDomain:"الدخول متاح فقط بإيميل الجامعة الذي ينتهي بـ @feng.bu.edu.eg — من فضلك سجّل بإيميلك الجامعي.",
-      errGeneric:"حصل خطأ أثناء تسجيل الدخول، حاول مرة تانية."
+      errDomain:"التسجيل متاح فقط بإيميل الجامعة الذي ينتهي بـ @feng.bu.edu.eg",
+      errGeneric:"حصل خطأ، حاول مرة تانية.",
+      errPasswordMismatch:"كلمتا المرور مش متطابقتين.",
+      errWeakPassword:"كلمة المرور لازم تكون 6 حروف/أرقام على الأقل.",
+      errEmailInUse:"الإيميل ده متسجل بحساب قبل كده — جرب تسجّل الدخول بدل إنشاء حساب جديد.",
+      errWrongPassword:"كلمة المرور غلط.",
+      errUserNotFound:"مفيش حساب بالإيميل ده — جرب تعمل حساب جديد.",
+      verifyEmailSent:"تم إنشاء الحساب! افتح إيميلك الجامعي وادخل على رابط التفعيل اللي وصلك، وبعدها ارجع سجّل دخول هنا.",
+      verifyEmailPending:"لازم تفعّل إيميلك الأول — افتح صندوق الوارد بتاعك ودوس على رابط التفعيل.",
+      resendVerification:"إعادة إرسال رابط التفعيل",
+      verificationResent:"تم إرسال رابط التفعيل تاني — تأكد من صندوق الـ Spam لو مش لاقيه.",
+      resetSent:"تم إرسال رابط إعادة تعيين كلمة المرور على إيميلك."
     },
     en: {
       dir:"ltr", lang:"en",
@@ -354,19 +416,31 @@
       heroSub:"Sign in with your university email and follow every announcement, deadline, and result as it happens.",
       stat1:"active competitions", stat2:"departments", stat3:"push notifications", stat3v:"instant",
       cardTitle:"Sign in",
-      cardHint:"Use your university Gmail to sign in or create your account.",
-      googleBtn:"Continue with university email",
-      divider:"First time here? Finish your profile",
+      cardHint:"Use your university email (ending in @feng.bu.edu.eg) to sign in or create your account.",
+      tabSignin:"I have an account", tabSignup:"New account",
+      lblEmailIn:"University email", lblPassIn:"Password", signinBtn:"Sign in", forgotBtn:"Forgot password?",
+      lblEmailUp:"University email", lblPassUp:"Password", lblPassConfirm:"Confirm password", signupBtn:"Create account",
       lblDept:"Department", lblMajor:"Major", lblYear:"Academic year", lblSid:"Student ID",
       footNote:"By continuing, you agree your university data is used to show competitions relevant to your department only.",
-      errDomain:"Sign-in is only allowed with a university email ending in @feng.bu.edu.eg — please use your university account.",
-      errGeneric:"Something went wrong while signing in. Please try again."
+      errDomain:"Sign-up is only allowed with a university email ending in @feng.bu.edu.eg",
+      errGeneric:"Something went wrong. Please try again.",
+      errPasswordMismatch:"Passwords don't match.",
+      errWeakPassword:"Password must be at least 6 characters.",
+      errEmailInUse:"This email already has an account — try signing in instead.",
+      errWrongPassword:"Incorrect password.",
+      errUserNotFound:"No account found with this email — try creating a new account.",
+      verifyEmailSent:"Account created! Check your university inbox and click the verification link, then come back and sign in.",
+      verifyEmailPending:"Please verify your email first — check your inbox for the verification link.",
+      resendVerification:"Resend verification link",
+      verificationResent:"Verification link resent — check your spam folder if you don't see it.",
+      resetSent:"A password reset link has been sent to your email."
     }
   };
 
   let current = "ar";
 
   function applyLang(code){
+    current = code;
     const s = strings[code];
     document.documentElement.setAttribute("dir", s.dir);
     document.documentElement.setAttribute("lang", s.lang);
@@ -376,8 +450,16 @@
     document.getElementById("heroSub").textContent = s.heroSub;
     document.getElementById("cardTitle").textContent = s.cardTitle;
     document.getElementById("cardHint").textContent = s.cardHint;
-    document.getElementById("googleBtnText").textContent = s.googleBtn;
-    document.getElementById("dividerText").textContent = s.divider;
+    document.getElementById("tabSignin").textContent = s.tabSignin;
+    document.getElementById("tabSignup").textContent = s.tabSignup;
+    document.getElementById("lblEmailIn").textContent = s.lblEmailIn;
+    document.getElementById("lblPassIn").textContent = s.lblPassIn;
+    document.getElementById("signinBtn").textContent = s.signinBtn;
+    document.getElementById("forgotBtn").textContent = s.forgotBtn;
+    document.getElementById("lblEmailUp").textContent = s.lblEmailUp;
+    document.getElementById("lblPassUp").textContent = s.lblPassUp;
+    document.getElementById("lblPassConfirm").textContent = s.lblPassConfirm;
+    document.getElementById("signupBtn").textContent = s.signupBtn;
     document.getElementById("lblDept").textContent = s.lblDept;
     document.getElementById("lblMajor").textContent = s.lblMajor;
     document.getElementById("lblYear").textContent = s.lblYear;
@@ -390,18 +472,41 @@
   }
 
   document.getElementById("langToggle").addEventListener("click", () => {
-    current = current === "ar" ? "en" : "ar";
-    applyLang(current);
+    applyLang(current === "ar" ? "en" : "ar");
   });
 
-  // ---------- Auth error display ----------
-  function showAuthError(key) {
+  // ---------- Tabs ----------
+  document.getElementById("tabSignin").addEventListener("click", () => switchTab("signin"));
+  document.getElementById("tabSignup").addEventListener("click", () => switchTab("signup"));
+  function switchTab(tab) {
+    document.getElementById("tabSignin").classList.toggle("active", tab === "signin");
+    document.getElementById("tabSignup").classList.toggle("active", tab === "signup");
+    document.getElementById("signinForm").classList.toggle("active", tab === "signin");
+    document.getElementById("signupForm").classList.toggle("active", tab === "signup");
+    hideAuthError();
+    hideSuccess();
+  }
+
+  // ---------- Message helpers ----------
+  function showAuthError(text) {
     const el = document.getElementById("authError");
-    el.textContent = strings[current][key];
+    el.textContent = text;
     el.style.display = "block";
+    hideSuccess();
   }
   function hideAuthError() {
     document.getElementById("authError").style.display = "none";
+  }
+  function showSuccess(text, extraNode) {
+    const el = document.getElementById("successBox");
+    el.innerHTML = "";
+    el.appendChild(document.createTextNode(text));
+    if (extraNode) el.appendChild(extraNode);
+    el.classList.add("show");
+    hideAuthError();
+  }
+  function hideSuccess() {
+    document.getElementById("successBox").classList.remove("show");
   }
 
   // ---------- One orchestrated entrance sequence ----------
@@ -423,30 +528,34 @@
 </script>
 
 <!-- ============================================================
-     Firebase Auth — REAL domain restriction, not decorative.
-     Two independent checks, both required:
-       1) `hd` hint on the Google popup — nudges Google's account
-          picker to the university domain (UX only, NOT security,
-          a user can still pick another Google account).
-       2) Hard check on user.email after sign-in — anyone who is
-          not @feng.bu.edu.eg is signed out immediately and never
-          reaches the app or writes a Firestore user doc.
-     A third check MUST also exist server-side (already wired in
-     backend/app.py via ALLOWED_EMAIL_DOMAIN) — the client check
-     below can be bypassed by anyone editing the JS, so the backend
-     check is what actually protects your Firestore data.
+     Firebase Auth — Email/Password, NOT Google Sign-In.
+     The university inbox (@feng.bu.edu.eg) is a real, working
+     mailbox (routed through Outlook) but it is not a Google
+     Account, so signInWithPopup(GoogleAuthProvider) can never
+     succeed for it. Email/Password + a mandatory verification
+     link sent to that inbox is what actually proves ownership.
+
+     Three checks protect the @feng.bu.edu.eg restriction:
+       1) Client-side domain check before any Firebase call (UX).
+       2) Firestore Security Rules (firestore.rules) — the real
+          gate on every read/write.
+       3) The Flask backend (app.py, ALLOWED_EMAIL_DOMAIN) — the
+          real gate on every API call.
+     A user is also blocked from reaching the app at all until
+     user.emailVerified is true, so a stray "@feng.bu.edu.eg"-
+     looking address someone doesn't actually control can never
+     complete sign-up.
      ============================================================ -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import {
-    getAuth, GoogleAuthProvider, signInWithPopup, signOut
+    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    sendEmailVerification, sendPasswordResetEmail, signOut
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, setDoc
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // TODO: paste your real Firebase project config here
-  // (Firebase Console → Project settings → General → Your apps → Web app)
   const firebaseConfig = {
     apiKey: "AIzaSyCQKHkZNQbETMpNHvPf7i9PPJkACX_Jdh8",
     authDomain: "university-competitions-hub.firebaseapp.com",
@@ -457,51 +566,124 @@
     measurementId: "G-VJVG1CFZKN"
   };
 
-  const ALLOWED_DOMAIN = "feng.bu.edu.eg"; // <-- the only domain allowed to sign in
+  const ALLOWED_DOMAIN = "feng.bu.edu.eg"; // <-- the only domain allowed to sign up
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  const provider = new GoogleAuthProvider();
-  // Hints Google's account chooser toward the university domain (UX only).
-  provider.setCustomParameters({ hd: ALLOWED_DOMAIN });
+  function isAllowedEmail(email) {
+    return (email || "").toLowerCase().endsWith("@" + ALLOWED_DOMAIN);
+  }
 
-  document.getElementById("googleBtn").addEventListener("click", async () => {
+  function friendlyError(err) {
+    const code = err && err.code;
+    const map = {
+      "auth/email-already-in-use": "errEmailInUse",
+      "auth/wrong-password": "errWrongPassword",
+      "auth/invalid-credential": "errWrongPassword",
+      "auth/user-not-found": "errUserNotFound",
+      "auth/weak-password": "errWeakPassword",
+    };
+    return strings[current][map[code] || "errGeneric"];
+  }
+
+  // ---------- Sign up ----------
+  document.getElementById("signupForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
     hideAuthError();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      const email = (user.email || "").toLowerCase();
 
-      // Hard, non-negotiable check — this is the real gate.
-      if (!email.endsWith("@" + ALLOWED_DOMAIN)) {
+    const email = document.getElementById("signupEmail").value.trim();
+    const password = document.getElementById("signupPassword").value;
+    const confirm = document.getElementById("signupPasswordConfirm").value;
+
+    if (!isAllowedEmail(email)) { showAuthError(strings[current].errDomain); return; }
+    if (password !== confirm) { showAuthError(strings[current].errPasswordMismatch); return; }
+    if (password.length < 6) { showAuthError(strings[current].errWeakPassword); return; }
+
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const user = cred.user;
+
+      await setDoc(doc(db, "users", user.uid), {
+        universityEmail: email.toLowerCase(),
+        fullName: email.split("@")[0],
+        studentId: document.getElementById("studentId").value.trim(),
+        department: document.getElementById("dept").value,
+        major: document.getElementById("major").value,
+        academicYear: document.getElementById("year").value,
+        role: "student",
+        createdAt: new Date().toISOString()
+      });
+
+      await sendEmailVerification(user);
+      await signOut(auth); // don't let them into the app until they verify
+
+      document.getElementById("signupForm").reset();
+      showSuccess(strings[current].verifyEmailSent);
+      switchTabKeepMessage("signin");
+    } catch (err) {
+      console.error(err);
+      showAuthError(friendlyError(err));
+    }
+  });
+
+  function switchTabKeepMessage(tab) {
+    document.getElementById("tabSignin").classList.toggle("active", tab === "signin");
+    document.getElementById("tabSignup").classList.toggle("active", tab === "signup");
+    document.getElementById("signinForm").classList.toggle("active", tab === "signin");
+    document.getElementById("signupForm").classList.toggle("active", tab === "signup");
+  }
+
+  // ---------- Sign in ----------
+  document.getElementById("signinForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    hideAuthError();
+
+    const email = document.getElementById("signinEmail").value.trim();
+    const password = document.getElementById("signinPassword").value;
+
+    if (!isAllowedEmail(email)) { showAuthError(strings[current].errDomain); return; }
+
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const user = cred.user;
+
+      if (!user.emailVerified) {
+        const resendBtn = document.createElement("button");
+        resendBtn.type = "button";
+        resendBtn.className = "link-btn";
+        resendBtn.style.display = "block";
+        resendBtn.style.marginTop = "8px";
+        resendBtn.textContent = strings[current].resendVerification;
+        resendBtn.addEventListener("click", async () => {
+          await sendEmailVerification(user);
+          showSuccess(strings[current].verificationResent);
+        });
+        showAuthError(strings[current].verifyEmailPending);
+        document.getElementById("authError").appendChild(document.createElement("br"));
+        document.getElementById("authError").appendChild(resendBtn);
         await signOut(auth);
-        showAuthError("errDomain");
         return;
       }
 
-      const userRef = doc(db, "users", user.uid);
-      const existing = await getDoc(userRef);
-
-      if (!existing.exists()) {
-        // First-time login — save profile fields from the form below.
-        await setDoc(userRef, {
-          fullName: user.displayName,
-          universityEmail: email,
-          studentId: document.getElementById("studentId").value.trim(),
-          department: document.getElementById("dept").value,
-          major: document.getElementById("major").value,
-          academicYear: document.getElementById("year").value,
-          role: "student",
-          createdAt: new Date().toISOString()
-        });
-      }
-
-      window.location.href = "home.html"; // main feed screen
+      window.location.href = "home.html";
     } catch (err) {
       console.error(err);
-      showAuthError("errGeneric");
+      showAuthError(friendlyError(err));
+    }
+  });
+
+  // ---------- Forgot password ----------
+  document.getElementById("forgotBtn").addEventListener("click", async () => {
+    const email = document.getElementById("signinEmail").value.trim();
+    if (!isAllowedEmail(email)) { showAuthError(strings[current].errDomain); return; }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showSuccess(strings[current].resetSent);
+    } catch (err) {
+      console.error(err);
+      showAuthError(friendlyError(err));
     }
   });
 </script>

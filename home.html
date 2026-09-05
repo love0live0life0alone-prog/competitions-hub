@@ -334,7 +334,7 @@
 
   // ---------- Auth guard ----------
   onAuthStateChanged(auth, async (user) => {
-    if (!user || !(user.email || "").toLowerCase().endsWith("@" + ALLOWED_DOMAIN)) {
+    if (!user || !(user.email || "").toLowerCase().endsWith("@" + ALLOWED_DOMAIN) || !user.emailVerified) {
       window.location.href = "index.html";
       return;
     }
