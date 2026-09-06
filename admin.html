@@ -664,7 +664,7 @@
     const top = entries.slice(0, 10);
 
     document.getElementById("lbParticipation").innerHTML = top.map((e, i) => `
-      <div class="lb-row lb-row-clickable" data-uid="${e.uid}" data-name="${e.name.replace(/"/g, "&quot;")}">
+      <div class="lb-row lb-row-clickable" data-uid="${e.uid}" data-name="${e.name.replace(/"/g, "&quot;")}" data-mode="all">
         <span class="lb-rank ${i === 0 ? "gold" : ""}">${i + 1}</span>
         <div class="info"><strong>${e.name}</strong><span>مشاركات مسجّلة — دوس لعرض التفاصيل</span></div>
         <div class="count"><strong>${e.submissions}</strong><span>مسابقة</span></div>
@@ -683,19 +683,20 @@
         })
     );
     document.getElementById("lbWinners").innerHTML = winEntries.map(({ studentId, name, count }, i) => `
-      <div class="lb-row lb-row-clickable" data-uid="${studentId}" data-name="${name.replace(/"/g, "&quot;")}">
+      <div class="lb-row lb-row-clickable" data-uid="${studentId}" data-name="${name.replace(/"/g, "&quot;")}" data-mode="winners">
         <span class="lb-rank ${i === 0 ? "gold" : ""}">${i + 1}</span>
         <div class="info"><strong>${name}</strong><span>حصل على مراكز — دوس لعرض التفاصيل</span></div>
         <div class="count"><strong>${count}</strong><span>مركز</span></div>
       </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px;">لسه مفيش نتائج معلنة.</p>`;
 
     document.querySelectorAll(".lb-row-clickable").forEach(row =>
-      row.addEventListener("click", () => openStudentDetailModal(row.dataset.uid, row.dataset.name)));
+    row.addEventListener("click", () => openStudentDetailModal(row.dataset.uid, row.dataset.name, row.dataset.mode)));
   }
 
   // ---------- Student drill-down modal (used by both leaderboards) ----------
-  function openStudentDetailModal(studentId, name) {
-    const details = studentDetailsMap[studentId] || [];
+  function openStudentDetailModal(studentId, name, mode) {
+    const all = studentDetailsMap[studentId] || [];
+    const details = mode === "winners" ? all.filter(d => d.rank) : all;
     document.getElementById("winnerDetailName").textContent = name;
     document.getElementById("winnerDetailList").innerHTML = details.map(d => {
       const rankLabel = d.rank ? `حصل على المركز ${d.rank}` : "شارك من غير ما ياخد مركز";
