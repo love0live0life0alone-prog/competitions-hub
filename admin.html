@@ -272,6 +272,9 @@
       tab.classList.add("active");
       document.getElementById("tabComps").style.display = tab.dataset.tab === "comps" ? "block" : "none";
       document.getElementById("tabLb").style.display = tab.dataset.tab === "lb" ? "block" : "none";
+      // Recompute on every visit — competitions/winners can change in the
+      // background (realtime listener) between visits to this tab.
+      if (tab.dataset.tab === "lb") loadLeaderboard();
     });
   });
 
@@ -604,17 +607,29 @@
   let studentDetailsMap = {};
 
   async function loadLeaderboard() {
+    // Freeze ONE consistent view of "competitions" for this whole run. It's
+    // fed by a realtime listener that can otherwise replace the array
+    // mid-function (we do several `await`s below) — if that happens between
+    // building the rank map and tallying win counts, the two end up computed
+    // from different snapshots and disagree (e.g. count says 2 wins but the
+    // breakdown only finds a rank for 1). Deriving winCounts from the exact
+    // same rankByCompStudent map removes that possibility entirely.
+    const comps = competitions;
+
     const snap = await getDocs(collection(db, "competition_interactions"));
 
-    // competitionId -> title, and `${competitionId}_${studentId}` -> rank —
-    // both derived from the competitions already loaded client-side.
+    // competitionId -> title, `${competitionId}_${studentId}` -> rank, and
+    // win tallies — all built from the single frozen snapshot above.
     const titleById = {};
     const rankByCompStudent = {};
-    competitions.forEach(c => {
+    const winCounts = {};
+    comps.forEach(c => {
       titleById[c.id] = c.title;
       if (c.status === "closed" && c.winners) {
         c.winners.forEach(w => {
-          if (w.studentId) rankByCompStudent[`${c.id}_${w.studentId}`] = w.rank;
+          if (!w.studentId) return; // ignore any legacy entries saved before this fix
+          rankByCompStudent[`${c.id}_${w.studentId}`] = w.rank;
+          winCounts[w.studentId] = (winCounts[w.studentId] || 0) + 1;
         });
       }
     });
@@ -657,14 +672,6 @@
 
     // Winners leaderboard: tally rank appearances across closed competitions,
     // grouped by studentId (not name) — safe against duplicate/similar names.
-    const winCounts = {};
-    competitions.filter(c => c.status === "closed" && c.winners).forEach(c => {
-      c.winners.forEach(w => {
-        if (!w.studentId) return; // ignore any legacy entries saved before this fix
-        winCounts[w.studentId] = (winCounts[w.studentId] || 0) + 1;
-      });
-    });
-
     const winEntries = await Promise.all(
       Object.entries(winCounts)
         .sort((a, b) => b[1] - a[1])
