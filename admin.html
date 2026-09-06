@@ -65,10 +65,24 @@
   .comp-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
 
   /* ---------- Students table for a competition ---------- */
-  .students-table{ width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px; }
-  .students-table th{ text-align:start; color:var(--ink-soft); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--line); }
-  .students-table td{ padding:7px 8px; border-bottom:1px solid var(--line); }
-  .students-table select{ padding:4px 6px; border-radius:6px; border:1px solid var(--line); font-size:12px; }
+  /* ---------- Students follow-up list (stacked cards — mobile friendly) ---------- */
+  .student-card{ border:1px solid var(--line); border-radius:11px; padding:12px 13px; margin-top:10px; }
+  .student-card .sc-name{ font-size:13.5px; font-weight:700; }
+  .student-card .sc-type{ font-size:10.5px; color:var(--ink-soft); margin-top:2px; }
+  .student-card .sc-extra{ font-size:11px; color:var(--ink-soft); margin-top:4px; line-height:1.6; }
+  .student-card .sc-contact-row{
+    display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line);
+    flex-wrap:wrap;
+  }
+  .student-card .sc-phone{ color:var(--teal); text-decoration:none; font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:5px; }
+  .student-card .sc-email{ font-size:11px; color:var(--ink-soft); }
+  .wa-dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .wa-dot.joined{ background:var(--teal); }
+  .wa-dot.not-joined{ background:var(--coral); }
+  .student-card .sc-follow{ margin-top:10px; }
+  .student-card .sc-follow select{
+    width:100%; padding:7px 8px; border-radius:7px; border:1px solid var(--line); font-size:12px; background:#FAFBFC;
+  }
 
   /* ---------- Leaderboard ---------- */
   .lb-row{ display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
@@ -88,6 +102,7 @@
     width:28px; height:28px; border-radius:50%; background:var(--gold-soft); color:var(--navy-950);
     display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800; flex:none;
   }
+  .winner-detail-rank.no-rank{ background:var(--paper); color:var(--ink-soft); font-size:14px; }
   .winner-detail-info strong{ display:block; font-size:13.5px; }
   .winner-detail-info span{ display:block; font-size:12px; color:var(--ink-soft); margin-top:2px; }
 
@@ -187,11 +202,11 @@
     </div>
   </div>
 
-  <!-- ---------- Winner drill-down modal ---------- -->
+  <!-- ---------- Student participation/results drill-down modal ---------- -->
   <div class="modal-scrim" id="winnerDetailModalScrim">
     <div class="modal">
-      <h2>مراكز <span id="winnerDetailName">—</span></h2>
-      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">كل المسابقات اللي حصل فيها على مركز، والمركز بالظبط، وكان مشارك فردي ولا جماعي.</p>
+      <h2>مسابقات <span id="winnerDetailName">—</span></h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">كل المسابقات اللي اشترك فيها، والمركز لو حصل على واحد، وكان فردي ولا جماعي، وهل كان معاه مشرف.</p>
       <div id="winnerDetailList"></div>
       <div class="row-between" style="margin-top:18px;justify-content:flex-end;">
         <button type="button" class="btn secondary" id="closeWinnerDetailBtn">إغلاق</button>
@@ -395,62 +410,50 @@
       return;
     }
 
-    panel.innerHTML = `
-      <table class="students-table">
-        <thead><tr><th>القائد / الفريق</th><th>التواصل</th><th>حالة المتابعة</th></tr></thead>
-        <tbody>
-          ${rows.map(r => {
-            const typeLabel = r.participationType === "team" ? "🧑‍🤝‍🧑 فريق" : r.participationType === "individual" ? "🧑 فردي" : "";
-            const membersHtml = r.teamMembers && r.teamMembers.length
-              ? `<div style="margin-top:4px;font-size:11.5px;color:var(--ink-soft);">
-                   ${r.teamMembers.map(m => {
-                     const mLink = toWaLink(m.phone);
-                     const label = `${m.name} (${m.phone})`;
-                     return mLink
-                       ? `<a href="${mLink}" target="_blank" rel="noopener" style="color:var(--ink-soft);">${label}</a>`
-                       : label;
-                   }).join("<br>")}
-                 </div>`
-              : "";
-            const supervisorHtml = r.supervisorName
-              ? `<div style="margin-top:2px;font-size:11.5px;color:var(--ink-soft);">مشرف: ${r.supervisorName}</div>` : "";
-            const notesHtml = r.notes
-              ? `<div style="margin-top:2px;font-size:11.5px;color:var(--ink-soft);">ملاحظات: ${r.notes}</div>` : "";
-            const waLink = toWaLink(r.leaderPhone);
-            const phoneHtml = r.leaderPhone
-              ? (waLink
-                  ? `<a href="${waLink}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:none;font-weight:700;">📞 ${r.leaderPhone}</a>`
-                  : `<div>📞 ${r.leaderPhone}</div>`)
-              : "";
-            const waStatusHtml = `<div style="margin-top:4px;">
-              <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;${r.whatsappJoined ? "background:var(--teal-soft);color:var(--teal);" : "background:var(--coral-soft);color:var(--coral);"}">
-                ${r.whatsappJoined ? "✅ منضم لجروب الواتساب" : "⏳ لسه مش منضم للجروب"}
-              </span>
-            </div>`;
-            const contactHtml = `
-              ${phoneHtml}
-              ${r.leaderEmail ? `<div style="font-size:11.5px;color:var(--ink-soft);">${r.leaderEmail}</div>` : ""}
-              ${waStatusHtml}`;
-            return `
-            <tr>
-              <td>
-                <strong>${r.name}</strong>
-                ${typeLabel ? `<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${typeLabel}</div>` : ""}
-                ${membersHtml}${supervisorHtml}${notesHtml}
-              </td>
-              <td>${contactHtml}</td>
-              <td>
-                <select data-comp="${competitionId}" data-student="${r.studentId}" class="follow-select">
-                  <option value="registered" ${r.followUpStatus === "registered" ? "selected" : ""}>مسجّل</option>
-                  <option value="in_progress" ${r.followUpStatus === "in_progress" ? "selected" : ""}>مستمر</option>
-                  <option value="completed" ${r.followUpStatus === "completed" ? "selected" : ""}>كمّل للنهاية</option>
-                  <option value="dropped" ${r.followUpStatus === "dropped" ? "selected" : ""}>انسحب</option>
-                </select>
-              </td>
-            </tr>`;
-          }).join("")}
-        </tbody>
-      </table>`;
+    panel.innerHTML = rows.map(r => {
+      const typeLabel = r.participationType === "team" ? "🧑‍🤝‍🧑 فريق" : r.participationType === "individual" ? "🧑 فردي" : "";
+      const membersHtml = r.teamMembers && r.teamMembers.length
+        ? `<div class="sc-extra">
+             ${r.teamMembers.map(m => {
+               const mLink = toWaLink(m.phone);
+               const label = `${m.name} (${m.phone})`;
+               return mLink
+                 ? `<a href="${mLink}" target="_blank" rel="noopener" style="color:var(--ink-soft);">${label}</a>`
+                 : label;
+             }).join("<br>")}
+           </div>`
+        : "";
+      const supervisorHtml = r.supervisorName
+        ? `<div class="sc-extra">مشرف: ${r.supervisorName}</div>` : "";
+      const notesHtml = r.notes
+        ? `<div class="sc-extra">ملاحظات: ${r.notes}</div>` : "";
+      const waLink = toWaLink(r.leaderPhone);
+      const dotSpan = `<span class="wa-dot ${r.whatsappJoined ? "joined" : "not-joined"}" title="${r.whatsappJoined ? "منضم لجروب الواتساب" : "لسه مش منضم للجروب"}"></span>`;
+      const phoneHtml = r.leaderPhone
+        ? (waLink
+            ? `<a href="${waLink}" target="_blank" rel="noopener" class="sc-phone">📞 ${r.leaderPhone}${dotSpan}</a>`
+            : `<span class="sc-phone" style="color:var(--ink);">📞 ${r.leaderPhone}${dotSpan}</span>`)
+        : "";
+
+      return `
+        <div class="student-card">
+          <div class="sc-name">${r.name}</div>
+          ${typeLabel ? `<div class="sc-type">${typeLabel}</div>` : ""}
+          ${membersHtml}${supervisorHtml}${notesHtml}
+          <div class="sc-contact-row">
+            ${phoneHtml}
+            ${r.leaderEmail ? `<span class="sc-email">${r.leaderEmail}</span>` : ""}
+          </div>
+          <div class="sc-follow">
+            <select data-comp="${competitionId}" data-student="${r.studentId}" class="follow-select">
+              <option value="registered" ${r.followUpStatus === "registered" ? "selected" : ""}>مسجّل</option>
+              <option value="in_progress" ${r.followUpStatus === "in_progress" ? "selected" : ""}>مستمر</option>
+              <option value="completed" ${r.followUpStatus === "completed" ? "selected" : ""}>كمّل للنهاية</option>
+              <option value="dropped" ${r.followUpStatus === "dropped" ? "selected" : ""}>انسحب</option>
+            </select>
+          </div>
+        </div>`;
+    }).join("");
     panel.style.display = "block";
 
     panel.querySelectorAll(".follow-select").forEach(sel => {
@@ -596,20 +599,46 @@
   });
 
   // ---------- Leaderboard ----------
-  let winDetailsMap = {}; // studentId -> [{ title, rank, participationType }], for the drill-down modal
+  // studentId -> [{ title, rank (null if no rank), participationType, supervisorName }]
+  // Built once per load and reused by BOTH leaderboards' click-through modal.
+  let studentDetailsMap = {};
 
   async function loadLeaderboard() {
     const snap = await getDocs(collection(db, "competition_interactions"));
-    const byStudent = {};
-    snap.docs.forEach(d => {
-      const data = d.data();
-      if (!byStudent[data.studentId]) byStudent[data.studentId] = { submissions: 0, wins: 0 };
-      if (data.formSubmittedAt) byStudent[data.studentId].submissions++;
+
+    // competitionId -> title, and `${competitionId}_${studentId}` -> rank —
+    // both derived from the competitions already loaded client-side.
+    const titleById = {};
+    const rankByCompStudent = {};
+    competitions.forEach(c => {
+      titleById[c.id] = c.title;
+      if (c.status === "closed" && c.winners) {
+        c.winners.forEach(w => {
+          if (w.studentId) rankByCompStudent[`${c.id}_${w.studentId}`] = w.rank;
+        });
+      }
     });
 
-    // Count wins by scanning competitions' winners arrays (need student IDs
-    // matched by name here since winners are entered as free text — for a
-    // production build, store studentId alongside each winner entry).
+    const byStudent = {};
+    studentDetailsMap = {};
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (!data.formSubmittedAt) return; // only count/list completed registrations
+      if (!byStudent[data.studentId]) byStudent[data.studentId] = { submissions: 0 };
+      byStudent[data.studentId].submissions++;
+
+      if (!studentDetailsMap[data.studentId]) studentDetailsMap[data.studentId] = [];
+      studentDetailsMap[data.studentId].push({
+        title: titleById[data.competitionId] || data.competitionId,
+        rank: rankByCompStudent[`${data.competitionId}_${data.studentId}`] || null,
+        participationType: data.participationType || null,
+        supervisorName: data.supervisorName || null,
+      });
+    });
+    // Competitions with a result come first, best rank first.
+    Object.values(studentDetailsMap).forEach(list =>
+      list.sort((a, b) => (a.rank ? a.rank : 999) - (b.rank ? b.rank : 999)));
+
     const entries = await Promise.all(Object.entries(byStudent).map(async ([uid, v]) => {
       const uSnap = await getDoc(doc(db, "users", uid));
       const name = uSnap.exists() ? uSnap.data().fullName : uid;
@@ -620,31 +649,21 @@
     const top = entries.slice(0, 10);
 
     document.getElementById("lbParticipation").innerHTML = top.map((e, i) => `
-      <div class="lb-row">
+      <div class="lb-row lb-row-clickable" data-uid="${e.uid}" data-name="${e.name.replace(/"/g, "&quot;")}">
         <span class="lb-rank ${i === 0 ? "gold" : ""}">${i + 1}</span>
-        <div class="info"><strong>${e.name}</strong><span>مشاركات مسجّلة</span></div>
+        <div class="info"><strong>${e.name}</strong><span>مشاركات مسجّلة — دوس لعرض التفاصيل</span></div>
         <div class="count"><strong>${e.submissions}</strong><span>مسابقة</span></div>
       </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px;">لا توجد بيانات كافية بعد.</p>`;
 
     // Winners leaderboard: tally rank appearances across closed competitions,
     // grouped by studentId (not name) — safe against duplicate/similar names.
-    // While we're at it, build the per-competition breakdown (title, rank,
-    // individual/team) that the click-through modal shows.
     const winCounts = {};
-    winDetailsMap = {};
     competitions.filter(c => c.status === "closed" && c.winners).forEach(c => {
       c.winners.forEach(w => {
         if (!w.studentId) return; // ignore any legacy entries saved before this fix
         winCounts[w.studentId] = (winCounts[w.studentId] || 0) + 1;
-        if (!winDetailsMap[w.studentId]) winDetailsMap[w.studentId] = [];
-        winDetailsMap[w.studentId].push({
-          title: c.title,
-          rank: w.rank,
-          participationType: w.participationType || null,
-        });
       });
     });
-    Object.values(winDetailsMap).forEach(list => list.sort((a, b) => a.rank - b.rank));
 
     const winEntries = await Promise.all(
       Object.entries(winCounts)
@@ -664,21 +683,23 @@
       </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px;">لسه مفيش نتائج معلنة.</p>`;
 
     document.querySelectorAll(".lb-row-clickable").forEach(row =>
-      row.addEventListener("click", () => openWinnerDetailModal(row.dataset.uid, row.dataset.name)));
+      row.addEventListener("click", () => openStudentDetailModal(row.dataset.uid, row.dataset.name)));
   }
 
-  // ---------- Winner drill-down modal ----------
-  function openWinnerDetailModal(studentId, name) {
-    const details = winDetailsMap[studentId] || [];
+  // ---------- Student drill-down modal (used by both leaderboards) ----------
+  function openStudentDetailModal(studentId, name) {
+    const details = studentDetailsMap[studentId] || [];
     document.getElementById("winnerDetailName").textContent = name;
     document.getElementById("winnerDetailList").innerHTML = details.map(d => {
+      const rankLabel = d.rank ? `حصل على المركز ${d.rank}` : "شارك من غير ما ياخد مركز";
       const typeLabel = d.participationType === "team" ? "🧑‍🤝‍🧑 جماعي" : d.participationType === "individual" ? "🧑 فردي" : "غير معروف";
+      const supervisorLabel = d.supervisorName ? `مشرف: ${d.supervisorName}` : "من غير مشرف";
       return `
         <div class="winner-detail-row">
-          <div class="winner-detail-rank">${d.rank}</div>
+          <div class="winner-detail-rank ${d.rank ? "" : "no-rank"}">${d.rank || "—"}</div>
           <div class="winner-detail-info">
             <strong>${d.title}</strong>
-            <span>المركز ${d.rank} · ${typeLabel}</span>
+            <span>${rankLabel} · ${typeLabel} · ${supervisorLabel}</span>
           </div>
         </div>`;
     }).join("") || `<p style="color:var(--ink-soft);font-size:13px;">مفيش تفاصيل متاحة.</p>`;
