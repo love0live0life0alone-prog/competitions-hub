@@ -81,7 +81,13 @@ def create_competition():
         "attachmentUrl": data.get("attachmentUrl"),
         "attachmentName": data.get("attachmentName"),
         "whatsappGroupLink": data.get("whatsappGroupLink"),
+        # "deadline" is the overall competition deadline (e.g. results/event
+        # date). "applicationDeadline" is when registration/applying closes —
+        # it's tracked separately so admins can renew/extend it on its own
+        # (see PATCH /api/competitions/<id>/application-deadline) without
+        # touching the competition's overall deadline.
         "deadline": data["deadline"],
+        "applicationDeadline": data.get("applicationDeadline") or data["deadline"],
         "status": "open",
         "createdBy": decoded["uid"],
         "createdAt": firestore.SERVER_TIMESTAMP,
@@ -112,11 +118,16 @@ def log_interaction():
         "studentId": decoded["uid"],
         "lastUpdatedAt": firestore.SERVER_TIMESTAMP,
     }
-    event_type = data["event"]  # "view" | "click" | "submit"
+    event_type = data["event"]  # "view" | "click" | "submit" | "whatsapp_join"
     field_map = {
         "view": "viewedAt",
         "click": "clickedLinkAt",
         "submit": "formSubmittedAt",
+        # Set when the student taps "Join WhatsApp group" after registering.
+        # Like "click", this reflects that they opened the invite link, not
+        # confirmed proof they stayed in the group — same caveat as the
+        # external-form problem this whole flow was built to avoid.
+        "whatsapp_join": "whatsappJoinedAt",
     }
     if event_type in field_map:
         update_payload[field_map[event_type]] = firestore.SERVER_TIMESTAMP

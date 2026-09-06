@@ -610,7 +610,8 @@
     }
 
     feed.innerHTML = list.map(c => {
-      const urgent = c.status === "open" && isUrgent(c.deadline);
+      const appDl = c.applicationDeadline || c.deadline;
+      const urgent = c.status === "open" && isUrgent(appDl);
       return `
       <article class="card status-${c.status}" data-id="${c.id}">
         <div class="card-top">
@@ -620,7 +621,7 @@
         <p>${c.description || ""}</p>
         <div class="card-meta ${urgent ? "urgent" : ""}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-          <span>${c.status === "open" ? strings[current].deadlinePrefix + " " + formatDate(c.deadline) : strings[current].ended}</span>
+          <span>${c.status === "open" ? strings[current].deadlinePrefix + " " + formatDate(appDl) : strings[current].ended}</span>
         </div>
       </article>`;
     }).join("");
@@ -667,24 +668,29 @@
   // WhatsApp glyph reused for both the group-join CTA and the sidebar contacts.
   const WA_ICON_SVG = `<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2zm5.7 14.2c-.2.6-1.4 1.2-1.9 1.2-.5.1-1.1.1-1.8-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1.1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5.2.6.7 1.9.8 2 .1.2.1.4 0 .6-.1.2-.2.3-.4.5-.2.2-.4.4-.5.6-.2.2-.4.4-.2.7.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.6 2.9 1.8.3.1.5.1.7-.1.2-.2.8-.9 1-1.2.2-.3.4-.3.7-.2.3.1 1.9.9 2.2 1.1.3.1.5.2.6.3.1.2.1.9-.1 1.5z"/></svg>`;
 
-  // Renders the CTA block for an OPEN competition: either "Apply now" (goes
-  // to the in-app registration form) or, once the current student has
-  // registered, the WhatsApp-group button + the original external link/form.
-  function renderApplyCta(c, isRegistered) {
-    if (!isRegistered) {
-      return `<button type="button" class="cta-link" id="ctaApplyBtn" style="width:100%;border:none;cursor:pointer;">${strings[current].applyNow}</button>`;
+  // Renders the CTA block for an OPEN competition: "Apply now" while the
+  // application window is still open, a closed-application notice once
+  // applicationDeadline has passed (even if the admin hasn't closed the
+  // competition itself yet), or — once the student has registered — the
+  // WhatsApp-group button + the original external link/form.
+  function renderApplyCta(c, isRegistered, applicationOpen) {
+    if (isRegistered) {
+      let html = `<div class="registered-box">
+        <strong>${strings[current].registeredTitle}</strong>
+        <span>${strings[current].registeredSub}</span>
+      </div>`;
+      if (c.whatsappGroupLink) {
+        html += `<a class="cta-whatsapp" id="ctaWhatsapp" href="${c.whatsappGroupLink}" target="_blank" rel="noopener">${WA_ICON_SVG}${strings[current].joinWhatsapp}</a>`;
+      }
+      if (c.link) {
+        html += `<a class="cta-secondary" id="ctaLink" href="${c.link}" target="_blank" rel="noopener">${strings[current].externalLinkLabel}</a>`;
+      }
+      return html;
     }
-    let html = `<div class="registered-box">
-      <strong>${strings[current].registeredTitle}</strong>
-      <span>${strings[current].registeredSub}</span>
-    </div>`;
-    if (c.whatsappGroupLink) {
-      html += `<a class="cta-whatsapp" href="${c.whatsappGroupLink}" target="_blank" rel="noopener">${WA_ICON_SVG}${strings[current].joinWhatsapp}</a>`;
+    if (!applicationOpen) {
+      return `<div class="deadline-box urgent"><span>${strings[current].applicationClosedNote}</span></div>`;
     }
-    if (c.link) {
-      html += `<a class="cta-secondary" id="ctaLink" href="${c.link}" target="_blank" rel="noopener">${strings[current].externalLinkLabel}</a>`;
-    }
-    return html;
+    return `<button type="button" class="cta-link" id="ctaApplyBtn" style="width:100%;border:none;cursor:pointer;">${strings[current].applyNow}</button>`;
   }
 
   // ---------- Detail overlay ----------
@@ -694,7 +700,9 @@
     logInteraction(id, "view");
 
     const body = document.getElementById("detailBody");
-    const urgent = c.status === "open" && isUrgent(c.deadline);
+    const appDl = c.applicationDeadline || c.deadline;
+    const urgent = c.status === "open" && isUrgent(appDl);
+    const applicationOpen = c.status === "open" && new Date() < new Date(appDl);
 
     let winnersHtml = "";
     if (c.status === "closed" && c.winners && c.winners.length) {
@@ -723,15 +731,23 @@
       } catch (e) { /* treat as not registered yet */ }
     }
 
-    const ctaHtml = c.status === "open" ? renderApplyCta(c, isRegistered) : "";
+    const ctaHtml = c.status === "open" ? renderApplyCta(c, isRegistered, applicationOpen) : "";
+
+    // Only show the overall competition deadline as a separate line when it
+    // actually differs from the application deadline — no need to repeat
+    // the same date twice.
+    const finalDlHtml = (c.deadline && c.deadline !== appDl)
+      ? `<div class="deadline-box"><span>${strings[current].finalDeadlinePrefix} ${formatDate(c.deadline)}</span></div>`
+      : "";
 
     body.innerHTML = `
       <span class="badge ${c.status}">${c.status === "open" ? strings[current].open : strings[current].closed}</span>
       <h2>${c.title}</h2>
       <div class="deadline-box ${urgent ? "urgent" : ""}">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-        <span>${c.status === "open" ? strings[current].deadlinePrefix + " " + formatDate(c.deadline) : strings[current].ended}</span>
+        <span>${c.status === "open" ? strings[current].deadlinePrefix + " " + formatDate(appDl) : strings[current].ended}</span>
       </div>
+      ${finalDlHtml}
       ${winnersHtml}
       <p class="desc">${c.description || ""}</p>
       ${attachmentHtml}
@@ -740,6 +756,9 @@
 
     const ctaLink = document.getElementById("ctaLink");
     if (ctaLink) ctaLink.addEventListener("click", () => logInteraction(id, "click"));
+
+    const ctaWhatsapp = document.getElementById("ctaWhatsapp");
+    if (ctaWhatsapp) ctaWhatsapp.addEventListener("click", () => logInteraction(id, "whatsapp_join"));
 
     const ctaApplyBtn = document.getElementById("ctaApplyBtn");
     if (ctaApplyBtn) ctaApplyBtn.addEventListener("click", () => openRegistrationModal(id));
@@ -867,6 +886,8 @@
       dept:"القسم", major:"التخصص", year:"الفرقة", save:"حفظ التعديلات", logout:"تسجيل الخروج",
       empty:"مفيش إعلانات دلوقتي، تابعنا أول بأول.",
       deadlinePrefix:"آخر موعد للتقديم:", ended:"المسابقة انتهت", yearPrefix:"الفرقة",
+      finalDeadlinePrefix:"الموعد النهائي للمسابقة:",
+      applicationClosedNote:"⏳ التقديم لهذه المسابقة اتقفل مؤقتًا — تابع الإعلانات لمعرفة أي تجديد للموعد.",
       winnersTitle:"🏆 المراكز الفائزة", attachment:"مرفق المسابقة", openFile:"فتح", applyNow:"التقديم للمسابقة",
       regModalTitle:"بيانات التسجيل",
       regModalSub:"املأ بياناتك عشان نقدر نتابع تسجيلك ونضمّك لجروب المسابقة.",
@@ -894,6 +915,8 @@
       dept:"Department", major:"Major", year:"Academic year", save:"Save changes", logout:"Sign out",
       empty:"No announcements yet — check back soon.",
       deadlinePrefix:"Deadline:", ended:"Competition ended", yearPrefix:"Year",
+      finalDeadlinePrefix:"Overall competition deadline:",
+      applicationClosedNote:"⏳ Applications for this competition are temporarily closed — check announcements for any deadline renewal.",
       winnersTitle:"🏆 Winners", attachment:"Competition attachment", openFile:"Open", applyNow:"Apply now",
       regModalTitle:"Registration details",
       regModalSub:"Fill in your details so we can follow up on your registration and add you to the competition group.",
