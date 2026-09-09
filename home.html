@@ -458,6 +458,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
   import {
     getFirestore, doc, getDoc, setDoc, collection, query, orderBy, onSnapshot
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -474,6 +475,7 @@
   };
   const ALLOWED_DOMAIN = "feng.bu.edu.eg";
   const API_BASE = "https://competitions-hub-production.up.railway.app";
+  const VAPID_KEY = "BErJT9ZsB1tM52vuF91W0avPBHp0FDhkKK3vzmUOxEBI7wBGaQ9bUJYIQ2MHcosAtpDGcveZkuUVXv_Wyi2f6Z0";
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
@@ -531,7 +533,34 @@
     userProfile = snap.exists() ? snap.data() : null;
     renderProfile();
     listenToCompetitions();
+    registerPushToken();
+    openFromUrlIfNeeded();
   });
+
+  async function registerPushToken() {
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return;
+      const reg = await navigator.serviceWorker.ready;
+      const messaging = getMessaging(app);
+      const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+      if (token) await setDoc(doc(db, "users", currentUser.uid), { fcmToken: token }, { merge: true });
+    } catch (e) {
+      console.error("push token error:", e);
+    }
+  }
+
+  function openFromUrlIfNeeded() {
+    const params = new URLSearchParams(location.search);
+    const targetId = params.get("competition");
+    if (!targetId) return;
+    const tryOpen = () => {
+      if (competitions.some(c => c.id === targetId)) openDetail(targetId);
+      else setTimeout(tryOpen, 300);
+    };
+    tryOpen();
+  }
 
   function renderProfile() {
     if (!userProfile) return;
@@ -995,6 +1024,11 @@
   // Register service worker
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(console.error);
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event.data && event.data.type === "open-competition" && event.data.competitionId) {
+        openDetail(event.data.competitionId);
+      }
+    });
   }
 </script>
 </body>

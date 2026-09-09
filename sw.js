@@ -79,9 +79,18 @@ self.addEventListener("fetch", (event) => {
 // ---------- Push notifications ----------
 // Triggered by Firebase Cloud Messaging even when no tab is open.
 self.addEventListener("push", (event) => {
-  let payload = { title: "إعلان جديد", body: "في مسابقة جديدة على التطبيق" };
+  let payload = {
+    title: "🎯 إعلان جديد",
+    body: "في تحديث جديد على تطبيق المسابقات — دوس لعرض التفاصيل",
+    competitionId: null,
+  };
   try {
-    payload = event.data.json();
+    const raw = event.data.json();
+    payload = {
+      title: (raw.notification && raw.notification.title) || raw.title || payload.title,
+      body: (raw.notification && raw.notification.body) || raw.body || payload.body,
+      competitionId: (raw.data && raw.data.competitionId) || raw.competitionId || null,
+    };
   } catch (e) {
     /* fall back to default payload above */
   }
@@ -91,9 +100,14 @@ self.addEventListener("push", (event) => {
       body: payload.body,
       icon: "/assets/icon-192.png",
       badge: "/assets/icon-192.png",
+      image: "/assets/icon-512.png",
+      vibrate: [200, 100, 200],
+      renotify: true,
+      tag: payload.competitionId ? `comp-${payload.competitionId}` : "general",
       data: { competitionId: payload.competitionId || null },
       dir: "rtl",
-      lang: "ar"
+      lang: "ar",
+      actions: [{ action: "open", title: "عرض التفاصيل 👀" }],
     })
   );
 });
@@ -102,12 +116,16 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetId = event.notification.data && event.notification.data.competitionId;
-  const targetUrl = targetId ? `/index.html?competition=${targetId}` : "/index.html";
+  const targetUrl = targetId ? `/home.html?competition=${targetId}` : "/home.html";
 
   event.waitUntil(
-    self.clients.matchAll({ type: "window" }).then((clientsArr) => {
-      const existing = clientsArr.find((c) => c.url.includes("/index.html"));
-      if (existing) return existing.focus();
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientsArr) => {
+      const existing = clientsArr.find((c) => c.url.includes("home.html") || c.url.includes("index.html"));
+      if (existing) {
+        existing.focus();
+        existing.postMessage({ type: "open-competition", competitionId: targetId });
+        return;
+      }
       return self.clients.openWindow(targetUrl);
     })
   );

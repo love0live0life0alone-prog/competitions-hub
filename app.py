@@ -17,6 +17,8 @@ Requires environment variables (set these in Railway, never commit them):
 
 import os
 import json
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import firebase_admin
@@ -93,9 +95,10 @@ def create_competition():
         "createdAt": firestore.SERVER_TIMESTAMP,
     })
 
-    send_push_to_all_students(
+    send_push(
         title="مسابقة جديدة 🎯",
-        body=data["title"],
+        body=f"{data['title']} — سجّل دلوقتي قبل ما يفوتك الموعد",
+        tokens=get_all_recipient_tokens(),
         competition_id=competition_ref.id,
     )
 
@@ -171,22 +174,137 @@ def log_interaction():
 
 
 # ---------- Push notification helper ----------
-def send_push_to_all_students(title, body, competition_id):
-    tokens_query = db.collection("users").where("role", "==", "student").stream()
-    tokens = [doc.to_dict().get("fcmToken") for doc in tokens_query if doc.to_dict().get("fcmToken")]
+CRON_SECRET = os.environ.get("CRON_SECRET", "")
 
+
+def get_all_recipient_tokens(exclude_registered_for=None):
+    """Tokens for students + admins. If exclude_registered_for is a competition id,
+    students who already submitted the form for it are skipped (they don't need
+    a reminder) — admins and everyone else still get it."""
+    submitted_ids = set()
+    if exclude_registered_for:
+        subs = db.collection("competition_interactions").where(
+            "competitionId", "==", exclude_registered_for
+        ).stream()
+        submitted_ids = {
+            s.to_dict().get("studentId") for s in subs if s.to_dict().get("formSubmittedAt")
+        }
+
+    users = db.collection("users").where("role", "in", ["student", "admin"]).stream()
+    tokens = []
+    for u in users:
+        ud = u.to_dict()
+        if ud.get("role") == "student" and u.id in submitted_ids:
+            continue
+        token = ud.get("fcmToken")
+        if token:
+            tokens.append(token)
+    return tokens
+
+
+def send_push(title, body, tokens, competition_id=None):
     if not tokens:
         return
-
-    # FCM allows up to 500 tokens per multicast call — batch if needed.
     for i in range(0, len(tokens), 500):
         batch = tokens[i:i + 500]
         message = messaging.MulticastMessage(
             notification=messaging.Notification(title=title, body=body),
-            data={"competitionId": competition_id},
+            data={"competitionId": competition_id or ""},
             tokens=batch,
         )
-        messaging.send_multicast(message)
+        try:
+            messaging.send_multicast(message)
+        except Exception as e:
+            print(f"push send error: {e}")
+
+
+EGYPT_TZ = ZoneInfo("Africa/Cairo")
+
+
+# ---------- Close competition + announce winners (admin only) ----------
+@app.route("/api/competitions/<competition_id>/close", methods=["POST"])
+def close_competition(competition_id):
+    decoded = verify_request_user()
+    if not decoded:
+        return jsonify({"error": "unauthorized"}), 401
+    if not require_admin(decoded):
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json() or {}
+    winners = data.get("winners", [])
+
+    comp_ref = db.collection("competitions").document(competition_id)
+    comp_snap = comp_ref.get()
+    if not comp_snap.exists:
+        return jsonify({"error": "not found"}), 404
+    comp = comp_snap.to_dict()
+
+    comp_ref.update({"status": "closed", "winners": winners})
+
+    for w in winners:
+        if not w.get("studentId"):
+            continue
+        db.collection("competition_interactions").document(
+            f"{competition_id}_{w['studentId']}"
+        ).set(
+            {"followUpStatus": "completed", "finalResult": "won", "rank": w.get("rank")},
+            merge=True,
+        )
+
+    names = "، ".join(w.get("name", "") for w in winners[:3])
+    body = f"{comp.get('title', '')} — الفايزين: {names}" if names else f"نتائج {comp.get('title', '')} إتعلنت"
+
+    send_push(
+        title="نتائج المسابقة إتعلنت 🏆",
+        body=body,
+        tokens=get_all_recipient_tokens(),
+        competition_id=competition_id,
+    )
+    return jsonify({"ok": True})
+
+
+# ---------- Deadline reminders (called by an external cron pinger) ----------
+@app.route("/api/cron/deadline-reminders", methods=["GET", "POST"])
+def deadline_reminders():
+    if not CRON_SECRET or request.headers.get("X-Cron-Secret") != CRON_SECRET:
+        return jsonify({"error": "forbidden"}), 403
+
+    now = datetime.now(EGYPT_TZ).replace(tzinfo=None)
+    sent = []
+
+    for doc_snap in db.collection("competitions").where("status", "==", "open").stream():
+        c = doc_snap.to_dict()
+        deadline_str = c.get("applicationDeadline") or c.get("deadline")
+        if not deadline_str:
+            continue
+        try:
+            deadline = datetime.fromisoformat(deadline_str)
+        except ValueError:
+            continue
+
+        hours_left = (deadline - now).total_seconds() / 3600
+
+        if 24 < hours_left <= 48 and not c.get("reminder48hSent"):
+            send_push(
+                title="⏰ باقي يومين على قفل التقديم",
+                body=f"{c.get('title', '')} — سجّل دلوقتي قبل ما يفوتك",
+                tokens=get_all_recipient_tokens(exclude_registered_for=doc_snap.id),
+                competition_id=doc_snap.id,
+            )
+            doc_snap.reference.update({"reminder48hSent": True})
+            sent.append(f"{doc_snap.id}:48h")
+
+        if 0 < hours_left <= 24 and not c.get("reminder24hSent"):
+            send_push(
+                title="🚨 باقي يوم واحد بس على قفل التقديم",
+                body=f"{c.get('title', '')} — آخر فرصة للتسجيل",
+                tokens=get_all_recipient_tokens(exclude_registered_for=doc_snap.id),
+                competition_id=doc_snap.id,
+            )
+            doc_snap.reference.update({"reminder24hSent": True})
+            sent.append(f"{doc_snap.id}:24h")
+
+    return jsonify({"ok": True, "sent": sent})
 
 
 if __name__ == "__main__":

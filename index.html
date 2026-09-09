@@ -375,6 +375,13 @@
           <input type="text" id="studentId" placeholder="مثال: 2021123456" inputmode="numeric" required>
         </div>
 
+        <div class="field" style="display:flex;align-items:flex-start;gap:10px;background:var(--paper);border-radius:10px;padding:12px 14px;">
+          <input type="checkbox" id="notifConsent" required style="width:18px;height:18px;margin-top:2px;flex:none;">
+          <label for="notifConsent" id="lblNotifConsent" style="font-size:12.5px;line-height:1.6;color:var(--ink);margin:0;">
+            أوافق على استقبال إشعارات التطبيق (مسابقات جديدة، تذكير بمواعيد التقديم، والنتائج) — الموافقة دي شرط أساسي لإكمال التسجيل.
+          </label>
+        </div>
+
         <button class="btn-primary" type="submit" id="signupBtn">إنشاء الحساب</button>
       </form>
 
@@ -402,6 +409,7 @@
       footNote:"بالمتابعة أنت توافق على استخدام بياناتك الجامعية لعرض المسابقات المناسبة لقسمك فقط.",
       errDomain:"التسجيل متاح فقط بإيميل الجامعة الذي ينتهي بـ @feng.bu.edu.eg",
       errFullName:"من فضلك اكتب اسمك بالكامل.",
+      errNotifConsent:"لازم توافق على استقبال إشعارات التطبيق عشان تكمّل التسجيل.",
       errGeneric:"حصل خطأ، حاول مرة تانية.",
       errPasswordMismatch:"كلمتا المرور مش متطابقتين.",
       errWeakPassword:"كلمة المرور لازم تكون 6 حروف/أرقام على الأقل.",
@@ -431,6 +439,7 @@
       footNote:"By continuing, you agree your university data is used to show competitions relevant to your department only.",
       errDomain:"Sign-up is only allowed with a university email ending in @feng.bu.edu.eg",
       errFullName:"Please enter your full name.",
+      errNotifConsent:"You must agree to receive app notifications to complete sign-up.",
       errGeneric:"Something went wrong. Please try again.",
       errPasswordMismatch:"Passwords don't match.",
       errWeakPassword:"Password must be at least 6 characters.",
@@ -500,6 +509,9 @@
     document.getElementById("lblYear").textContent = s.lblYear;
     document.getElementById("lblSid").textContent = s.lblSid;
     document.getElementById("footNote").textContent = s.footNote;
+    document.getElementById("lblNotifConsent").textContent = code === "ar"
+      ? "أوافق على استقبال إشعارات التطبيق (مسابقات جديدة، تذكير بمواعيد التقديم، والنتائج) — الموافقة دي شرط أساسي لإكمال التسجيل."
+      : "I agree to receive app notifications (new competitions, deadline reminders, and results) — this is required to complete sign-up.";
     const stat = document.querySelectorAll("#statStrip span");
     stat[0].textContent = s.stat1; stat[1].textContent = s.stat2; stat[2].textContent = s.stat3;
     document.querySelectorAll("#statStrip strong")[2].textContent = s.stat3v;
@@ -642,6 +654,7 @@
 
     if (!isAllowedEmail(email)) { showAuthError(strings[current].errDomain); return; }
     if (!fullName) { showAuthError(strings[current].errFullName); return; }
+    if (!document.getElementById("notifConsent").checked) { showAuthError(strings[current].errNotifConsent); return; }
     if (password !== confirm) { showAuthError(strings[current].errPasswordMismatch); return; }
     if (password.length < 6) { showAuthError(strings[current].errWeakPassword); return; }
 
@@ -657,6 +670,7 @@
         major: document.getElementById("major").value,
         academicYear: document.getElementById("year").value,
         role: "student",
+        notificationsConsent: true,
         createdAt: new Date().toISOString()
       });
 

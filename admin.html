@@ -231,6 +231,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
   import {
     getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addDoc,
     updateDoc, where, getDocs, serverTimestamp
@@ -244,6 +245,7 @@
     measurementId: "G-VJVG1CFZKN"
   };
   const API_BASE = "https://competitions-hub-production.up.railway.app";
+  const VAPID_KEY = "BErJT9ZsB1tM52vuF91W0avPBHp0FDhkKK3vzmUOxEBI7wBGaQ9bUJYIQ2MHcosAtpDGcveZkuUVXv_Wyi2f6Z0";
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
@@ -263,7 +265,22 @@
     }
     listenToCompetitions();
     loadLeaderboard();
+    registerPushToken(user.uid);
   });
+
+  async function registerPushToken(uid) {
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return;
+      const reg = await navigator.serviceWorker.register("sw.js");
+      const messaging = getMessaging(app);
+      const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+      if (token) await updateDoc(doc(db, "users", uid), { fcmToken: token });
+    } catch (e) {
+      console.error("push token error:", e);
+    }
+  }
 
   // ---------- Tabs ----------
   document.querySelectorAll(".tab").forEach(tab => {
@@ -587,17 +604,13 @@
       return;
     }
 
-    // Mark each winner's interaction record as a completed, won entry too —
-    // keeps the funnel stats and the winners list consistent with each other.
-    await Promise.all(winners.map(w =>
-      updateDoc(doc(db, "competition_interactions", `${closingId}_${w.studentId}`), {
-        followUpStatus: "completed",
-        finalResult: "won",
-        rank: w.rank
-      })
-    ));
+    const token = await auth.currentUser.getIdToken();
+    await fetch(`${API_BASE}/api/competitions/${closingId}/close`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({ winners })
+    });
 
-    await updateDoc(doc(db, "competitions", closingId), { status: "closed", winners });
     document.getElementById("winModalScrim").classList.remove("show");
   });
 
