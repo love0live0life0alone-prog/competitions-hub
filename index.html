@@ -609,7 +609,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import {
-    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
     sendEmailVerification, sendPasswordResetEmail, signOut
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
@@ -631,6 +631,15 @@
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
+
+  // لو المستخدم عنده session صالحة بالفعل (سجل دخول قبل كده ومحقق إيميله)،
+  // امنعه من الوقوف على صفحة تسجيل الدخول تاني وودّيه لـ home.html على طول.
+  // ده مهم بالذات لما التطبيق المثبت يفتح على index.html كـ start_url.
+  onAuthStateChanged(auth, (user) => {
+    if (user && user.emailVerified) {
+      window.location.href = "home.html";
+    }
+  });
 
   function isAllowedEmail(email) {
     return (email || "").toLowerCase().endsWith("@" + ALLOWED_DOMAIN);
