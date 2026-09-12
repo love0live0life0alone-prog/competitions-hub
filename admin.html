@@ -153,7 +153,8 @@
     overflow-y:auto; -webkit-overflow-scrolling:touch;
   }
   html[dir="rtl"] .sidebar{ transform:translateX(105%); }
-  .sidebar.open{ transform:translateX(0); }
+  .sidebar.open,
+  html[dir="rtl"] .sidebar.open{ transform:translateX(0); }
   .profile-block{ display:flex; align-items:center; gap:12px; padding-bottom:18px; border-bottom:1px solid rgba(255,255,255,0.12); }
   .avatar{
     width:46px; height:46px; border-radius:50%; background:var(--gold); color:var(--navy-950);
