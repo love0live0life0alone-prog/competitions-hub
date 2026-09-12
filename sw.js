@@ -6,8 +6,8 @@
 // - Basic Background Sync queue for offline interactions
 // ============================================================
 
-const APP_SHELL_CACHE = "uch-shell-v3";
-const DATA_CACHE = "uch-data-v3";
+const APP_SHELL_CACHE = "uch-shell-v4";
+const DATA_CACHE = "uch-data-v4";
 
 const APP_SHELL_FILES = [
   "./",
@@ -49,14 +49,17 @@ self.addEventListener("fetch", (event) => {
 
   if (isApiCall) {
     // Network-first, fall back to last cached data when offline.
+    // Only GET responses are cacheable — the Cache API rejects POST/PUT/etc.
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(DATA_CACHE).then((cache) => cache.put(request, clone));
+          if (request.method === "GET" && response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(DATA_CACHE).then((cache) => cache.put(request, clone));
+          }
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(() => (request.method === "GET" ? caches.match(request) : Response.error()))
     );
     return;
   }

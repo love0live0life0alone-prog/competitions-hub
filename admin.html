@@ -418,7 +418,7 @@
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
       const permission = await Notification.requestPermission();
       if (permission !== "granted") return;
-      const reg = await navigator.serviceWorker.register("sw.js");
+      const reg = await navigator.serviceWorker.ready;
       const messaging = getMessaging(app);
       const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
       if (token) await updateDoc(doc(db, "users", uid), { fcmToken: token });
