@@ -204,16 +204,38 @@ def get_all_recipient_tokens(exclude_registered_for=None):
 
 def send_push(title, body, tokens, competition_id=None):
     if not tokens:
+        print("push: no tokens to send to — skipping")
         return
+
+    print(f"push: sending '{title}' to {len(tokens)} token(s)")
+    base_url = "https://love0live0life0alone-prog.github.io/competitions-hub"
+    link = f"{base_url}/home.html?competition={competition_id}" if competition_id else f"{base_url}/home.html"
+
     for i in range(0, len(tokens), 500):
         batch = tokens[i:i + 500]
-        message = messaging.MulticastMessage(
-            notification=messaging.Notification(title=title, body=body),
-            data={"competitionId": competition_id or ""},
-            tokens=batch,
-        )
+        messages = [
+            messaging.Message(
+                notification=messaging.Notification(title=title, body=body),
+                data={"competitionId": competition_id or ""},
+                webpush=messaging.WebpushConfig(
+                    notification=messaging.WebpushNotification(
+                        icon=f"{base_url}/icon-192.png",
+                        badge=f"{base_url}/icon-192.png",
+                    ),
+                    fcm_options=messaging.WebpushFCMOptions(link=link),
+                ),
+                token=token,
+            )
+            for token in batch
+        ]
         try:
-            messaging.send_multicast(message)
+            response = messaging.send_each(messages)
+            success = sum(1 for r in response.responses if r.success)
+            failure = len(response.responses) - success
+            print(f"push: {success} succeeded, {failure} failed")
+            for j, r in enumerate(response.responses):
+                if not r.success:
+                    print(f"push: token[{j}] failed — {r.exception}")
         except Exception as e:
             print(f"push send error: {e}")
 
