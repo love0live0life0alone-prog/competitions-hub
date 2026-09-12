@@ -235,24 +235,9 @@ def send_push(title, body, tokens, competition_id=None):
             print(f"push: {success} succeeded, {failure} failed")
             for j, r in enumerate(response.responses):
                 if not r.success:
-                    err = str(r.exception)
-                    print(f"push: token[{j}] failed — {err}")
-                    if "not-registered" in err or "Unregistered" in err or "Device unregistered" in err:
-                        clean_dead_token(batch[j])
+                    print(f"push: token[{j}] failed — {r.exception}")
         except Exception as e:
             print(f"push send error: {e}")
-
-
-def clean_dead_token(dead_token):
-    """Remove a stale fcmToken from whichever user document still has it,
-    so the next login/registerPushToken() call replaces it with a fresh one."""
-    try:
-        docs = db.collection("users").where("fcmToken", "==", dead_token).stream()
-        for d in docs:
-            d.reference.update({"fcmToken": firestore.DELETE_FIELD})
-            print(f"push: cleared dead token for user {d.id}")
-    except Exception as e:
-        print(f"push: clean_dead_token error: {e}")
 
 
 EGYPT_TZ = ZoneInfo("Africa/Cairo")
