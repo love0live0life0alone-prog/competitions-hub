@@ -6,9 +6,10 @@
 <title>لوحة تحكم المسؤولين</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#14213D">
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-<link rel="icon" href="assets/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="لوحة تحكم المسؤولين">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -132,14 +133,90 @@
   .winner-input-row{ display:flex; gap:8px; margin-bottom:8px; }
   .winner-input-row input{ flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--line); font-size:13px; }
   .winner-input-row input.rank{ flex:0 0 60px; text-align:center; }
+
+  /* ---------- Sidebar (admin) ---------- */
+  .icon-btn{
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16);
+    color:#fff; width:38px; height:38px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .scrim{
+    position:fixed; inset:0; background:rgba(13,23,39,0.45); opacity:0; pointer-events:none;
+    transition:opacity .2s ease; z-index:59;
+  }
+  .scrim.show{ opacity:1; pointer-events:auto; }
+  .sidebar{
+    position:fixed; top:0; bottom:0; inset-inline-start:0; width:82%; max-width:320px;
+    background:var(--navy-900); color:#fff; z-index:60;
+    transform:translateX(-105%); transition:transform .28s cubic-bezier(.22,.9,.35,1);
+    display:flex; flex-direction:column; padding:22px 18px;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  html[dir="rtl"] .sidebar{ transform:translateX(105%); }
+  .sidebar.open{ transform:translateX(0); }
+  .profile-block{ display:flex; align-items:center; gap:12px; padding-bottom:18px; border-bottom:1px solid rgba(255,255,255,0.12); }
+  .avatar{
+    width:46px; height:46px; border-radius:50%; background:var(--gold); color:var(--navy-950);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:17px; flex:none;
+  }
+  .profile-block strong{ display:block; font-size:15px; }
+  .profile-block span{ display:block; font-size:12px; color:rgba(255,255,255,0.55); margin-top:2px; }
+  .back-link{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    margin:14px 0; padding:11px 14px; border-radius:10px;
+    background:var(--gold); color:var(--navy-950); text-decoration:none;
+    font-size:13.5px; font-weight:800;
+  }
+  html[dir="rtl"] .back-link svg{ transform:scaleX(-1); }
+  .side-section{ padding:18px 0; border-bottom:1px solid rgba(255,255,255,0.10); }
+  .side-section:last-child{ border-bottom:none; }
+  .side-label{ font-size:12px; color:rgba(255,255,255,0.45); margin:0 0 10px; }
+  .save-btn{
+    width:100%; margin-top:6px; padding:10px; border-radius:8px; border:none;
+    background:var(--gold); color:var(--navy-950); font-weight:700; font-size:13.5px; cursor:pointer; font-family:inherit;
+  }
+  .save-btn.outline{ background:transparent; border:1px solid rgba(255,255,255,0.25); color:#fff; }
+  .logout-btn{
+    margin-top:auto; padding-top:16px; text-align:center; font-size:13px;
+    color:rgba(255,255,255,0.55); background:none; border:none; cursor:pointer; font-family:inherit;
+  }
 </style>
 </head>
 <body>
 
   <header class="topbar">
-    <h1>لوحة تحكم — رعاية الشباب</h1>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="icon-btn" id="menuBtn" aria-label="menu">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <h1>لوحة تحكم — رعاية الشباب</h1>
+    </div>
     <span class="badge-admin">Admin</span>
   </header>
+
+  <div class="scrim" id="scrim"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="profile-block">
+      <div class="avatar" id="avatarInitial">؟</div>
+      <div>
+        <strong id="sideName">—</strong>
+        <span>Admin</span>
+      </div>
+    </div>
+
+    <a href="home.html" class="back-link">
+      <span>🎓 واجهة الطالب</span>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+    </a>
+
+    <div class="side-section">
+      <p class="side-label">التطبيق</p>
+      <button class="save-btn" id="installAppBtn" style="margin-bottom:8px;">📲 تثبيت التطبيق</button>
+      <button class="save-btn outline" id="forceUpdateBtn">🔄 تحديث فوري (مسح الكاش)</button>
+    </div>
+
+    <button class="logout-btn" id="sidebarLogoutBtn">تسجيل الخروج</button>
+  </aside>
 
   <nav class="tabs">
     <div class="tab active" data-tab="comps">المسابقات والإحصائيات</div>
@@ -237,7 +314,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
   import {
     getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addDoc,
@@ -270,10 +347,70 @@
       window.location.href = "home.html"; // not an admin — bounce to the student feed
       return;
     }
+    const profile = snap.data();
+    const displayName = profile.fullName || user.email;
+    document.getElementById("sideName").textContent = displayName;
+    document.getElementById("avatarInitial").textContent = displayName.trim().charAt(0);
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(console.error);
+    }
+
     listenToCompetitions();
     loadLeaderboard();
     registerPushToken(user.uid);
   });
+
+  // ---------- Install app / force update (PWA) ----------
+  let deferredInstallPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+  });
+
+  async function handleInstallClick() {
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    if (isStandalone) { alert("التطبيق متثبت بالفعل على جهازك ✅"); return; }
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+    } else {
+      alert('لو مش شايف خيار التثبيت التلقائي، دوس على زرار المشاركة/القائمة في المتصفح واختار "إضافة إلى الشاشة الرئيسية".');
+    }
+  }
+
+  async function handleForceUpdateClick() {
+    try {
+      if ("serviceWorker" in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch (e) {
+      console.error("force update error:", e);
+    } finally {
+      location.reload();
+    }
+  }
+
+  // ---------- Sidebar open/close ----------
+  function openSidebar() {
+    document.getElementById("sidebar").classList.add("open");
+    document.getElementById("scrim").classList.add("show");
+  }
+  function closeSidebar() {
+    document.getElementById("sidebar").classList.remove("open");
+    document.getElementById("scrim").classList.remove("show");
+  }
+  document.getElementById("menuBtn").addEventListener("click", openSidebar);
+  document.getElementById("scrim").addEventListener("click", closeSidebar);
+  document.getElementById("installAppBtn").addEventListener("click", handleInstallClick);
+  document.getElementById("forceUpdateBtn").addEventListener("click", handleForceUpdateClick);
+  document.getElementById("sidebarLogoutBtn").addEventListener("click", () => signOut(auth));
 
   async function registerPushToken(uid) {
     try {

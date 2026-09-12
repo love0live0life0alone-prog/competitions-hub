@@ -10,11 +10,11 @@ const APP_SHELL_CACHE = "uch-shell-v3";
 const DATA_CACHE = "uch-data-v3";
 
 const APP_SHELL_FILES = [
-  "/",
-  "/index.html",
-  "/home.html",
-  "/admin.html",
-  "/manifest.json"
+  "./",
+  "./index.html",
+  "./home.html",
+  "./admin.html",
+  "./manifest.json"
 ];
 
 // ---------- Install: pre-cache the app shell ----------
@@ -98,9 +98,9 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: "/assets/icon-192.png",
-      badge: "/assets/icon-192.png",
-      image: "/assets/icon-512.png",
+      icon: "./icon-192.png",
+      badge: "./icon-192.png",
+      image: "./icon-512.png",
       vibrate: [200, 100, 200],
       renotify: true,
       tag: payload.competitionId ? `comp-${payload.competitionId}` : "general",

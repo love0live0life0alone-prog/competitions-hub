@@ -6,9 +6,10 @@
 <title>المسابقات — الرئيسية</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#14213D">
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-<link rel="icon" href="assets/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ملتقى مسابقات الجامعة">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -389,6 +390,12 @@
         </select>
       </div>
       <button class="save-btn" id="saveProfileBtn">حفظ التعديلات</button>
+    </div>
+
+    <div class="side-section">
+      <p class="side-label">التطبيق</p>
+      <button class="save-btn" id="installAppBtn" style="margin-bottom:8px;">📲 تثبيت التطبيق</button>
+      <button class="save-btn" id="forceUpdateBtn" style="background:transparent;border:1px solid rgba(255,255,255,0.25);color:#fff;">🔄 تحديث فوري (مسح الكاش)</button>
     </div>
 
     <div class="side-section" id="contactSection">
@@ -897,6 +904,42 @@
     }
   });
 
+  // ---------- Install app / force update (PWA) ----------
+  let deferredInstallPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+  });
+
+  async function handleInstallClick() {
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    if (isStandalone) { alert("التطبيق متثبت بالفعل على جهازك ✅"); return; }
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+    } else {
+      alert('لو مش شايف خيار التثبيت التلقائي، دوس على زرار المشاركة/القائمة في المتصفح واختار "إضافة إلى الشاشة الرئيسية".');
+    }
+  }
+
+  async function handleForceUpdateClick() {
+    try {
+      if ("serviceWorker" in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch (e) {
+      console.error("force update error:", e);
+    } finally {
+      location.reload();
+    }
+  }
+
   // ---------- Sidebar open/close ----------
   function openSidebar() {
     document.getElementById("sidebar").classList.add("open");
@@ -908,6 +951,8 @@
   }
   document.getElementById("menuBtn").addEventListener("click", openSidebar);
   document.getElementById("scrim").addEventListener("click", closeSidebar);
+  document.getElementById("installAppBtn").addEventListener("click", handleInstallClick);
+  document.getElementById("forceUpdateBtn").addEventListener("click", handleForceUpdateClick);
 
   // ---------- i18n ----------
   const strings = {
