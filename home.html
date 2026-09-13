@@ -237,6 +237,40 @@
   }
   .winner-row span{ font-size:13.5px; }
 
+/* ---------- Competition media gallery ---------- */
+.gallery-wrap{ position:relative; border-radius:14px; overflow:hidden; margin-bottom:18px; background:var(--paper); aspect-ratio:16/10; }
+.gallery-track{ display:flex; height:100%; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.gallery-track::-webkit-scrollbar{ display:none; }
+.gallery-slide{ flex:0 0 100%; scroll-snap-align:start; height:100%; cursor:pointer; }
+.gallery-slide img{ width:100%; height:100%; object-fit:cover; display:block; }
+.gallery-counter{
+  position:absolute; bottom:10px; inset-inline-end:10px; background:rgba(13,23,39,0.6); color:#fff;
+  font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:999px; pointer-events:none;
+}
+.lightbox{
+  position:fixed; inset:0; background:rgba(8,12,20,0.96); z-index:80; display:none;
+  align-items:center; justify-content:center; touch-action:pan-y;
+}
+.lightbox.open{ display:flex; }
+.lightbox img{ max-width:94vw; max-height:80vh; object-fit:contain; border-radius:6px; }
+.lightbox-close{
+  position:absolute; top:16px; inset-inline-end:16px; width:40px; height:40px; border-radius:50%;
+  background:rgba(255,255,255,0.12); border:none; color:#fff; font-size:20px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.lightbox-nav{
+  position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px; border-radius:50%;
+  background:rgba(255,255,255,0.12); border:none; color:#fff; font-size:20px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.lightbox-prev{ inset-inline-start:14px; }
+.lightbox-next{ inset-inline-end:14px; }
+.lightbox-counter{ position:absolute; bottom:20px; color:#fff; font-size:13px; opacity:.8; }
+
+@media (prefers-reduced-motion: reduce){
+  .gallery-track{ scroll-behavior:auto; }
+}
+
   @media (min-width:760px){
     .feed{ padding:24px; }
     .sidebar{ width:320px; }
@@ -451,6 +485,15 @@
     <div class="detail-body" id="detailBody"><!-- injected --></div>
   </div>
 
+  <!-- ---------- Fullscreen media viewer ---------- -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true">
+    <button class="lightbox-close" id="lightboxClose" aria-label="Close">✕</button>
+    <button class="lightbox-nav lightbox-prev" id="lightboxPrev" aria-label="Previous">‹</button>
+    <img id="lightboxImg" alt="">
+    <button class="lightbox-nav lightbox-next" id="lightboxNext" aria-label="Next">›</button>
+    <span class="lightbox-counter" id="lightboxCounter"></span>
+  </div>
+
   <!-- ---------- Registration modal (Apply now) ---------- -->
   <div class="modal-scrim" id="regModalScrim">
     <div class="reg-modal">
@@ -506,7 +549,7 @@
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
   import {
-    getFirestore, doc, getDoc, setDoc, collection, query, orderBy, onSnapshot
+    getFirestore, doc, getDoc, setDoc, collection, query, orderBy, onSnapshot, getDocs
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   // TODO: same config as index.html
@@ -774,6 +817,84 @@
     return `<button type="button" class="cta-link" id="ctaApplyBtn" style="width:100%;border:none;cursor:pointer;">${strings[current].applyNow}</button>`;
   }
 
+  // ---------- Media gallery ----------
+  let galleryImages = [];
+
+  async function getCompetitionMedia(competitionId) {
+    try {
+      const q = query(collection(db, "competitions", competitionId, "media"), orderBy("order", "asc"));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) {
+      console.error("media load error:", e);
+      return [];
+    }
+  }
+
+  function renderGalleryHtml(images) {
+    if (!images.length) return "";
+    return `
+      <div class="gallery-wrap">
+        <div class="gallery-track" id="galleryTrack">
+          ${images.map((img, i) => `
+            <div class="gallery-slide" data-index="${i}">
+              <img src="${img.url}" loading="${i === 0 ? "eager" : "lazy"}" alt="${img.caption || ""}">
+            </div>`).join("")}
+        </div>
+        ${images.length > 1 ? `<span class="gallery-counter" id="galleryCounter">1 / ${images.length}</span>` : ""}
+      </div>`;
+  }
+
+  function wireGalleryEvents(images) {
+    galleryImages = images;
+    const track = document.getElementById("galleryTrack");
+    if (!track) return;
+
+    track.querySelectorAll(".gallery-slide").forEach(slide => {
+      slide.addEventListener("click", () => openLightbox(Number(slide.dataset.index)));
+    });
+
+    if (images.length > 1) {
+      const counter = document.getElementById("galleryCounter");
+      track.addEventListener("scroll", () => {
+        const idx = Math.round(track.scrollLeft / track.clientWidth);
+        counter.textContent = `${idx + 1} / ${images.length}`;
+      });
+    }
+  }
+
+  let lightboxIndex = 0;
+  function openLightbox(index) {
+    lightboxIndex = index;
+    updateLightbox();
+    document.getElementById("lightbox").classList.add("open");
+  }
+  function closeLightbox() {
+    document.getElementById("lightbox").classList.remove("open");
+  }
+  function updateLightbox() {
+    const img = galleryImages[lightboxIndex];
+    document.getElementById("lightboxImg").src = img.url;
+    document.getElementById("lightboxImg").alt = img.caption || "";
+    document.getElementById("lightboxCounter").textContent = `${lightboxIndex + 1} / ${galleryImages.length}`;
+  }
+  function lightboxNav(dir) {
+    lightboxIndex = (lightboxIndex + dir + galleryImages.length) % galleryImages.length;
+    updateLightbox();
+  }
+  document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
+  document.getElementById("lightboxPrev").addEventListener("click", () => lightboxNav(-1));
+  document.getElementById("lightboxNext").addEventListener("click", () => lightboxNav(1));
+  document.getElementById("lightbox").addEventListener("click", (e) => {
+    if (e.target.id === "lightbox") closeLightbox();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (!document.getElementById("lightbox").classList.contains("open")) return;
+    if (e.key === "Escape") closeLightbox();
+    if (e.key === "ArrowRight") lightboxNav(current === "ar" ? -1 : 1);
+    if (e.key === "ArrowLeft") lightboxNav(current === "ar" ? 1 : -1);
+  });
+
   // ---------- Detail overlay ----------
   async function openDetail(id) {
     const c = competitions.find(x => x.id === id);
@@ -821,7 +942,10 @@
       ? `<div class="deadline-box"><span>${strings[current].finalDeadlinePrefix} ${formatDate(c.deadline)}</span></div>`
       : "";
 
+    const mediaImages = await getCompetitionMedia(id);
+
     body.innerHTML = `
+      ${renderGalleryHtml(mediaImages)}
       <span class="badge ${c.status}">${c.status === "open" ? strings[current].open : strings[current].closed}</span>
       <h2>${c.title}</h2>
       <div class="deadline-box ${urgent ? "urgent" : ""}">
@@ -843,6 +967,8 @@
 
     const ctaApplyBtn = document.getElementById("ctaApplyBtn");
     if (ctaApplyBtn) ctaApplyBtn.addEventListener("click", () => openRegistrationModal(id));
+
+    wireGalleryEvents(mediaImages);
 
     document.getElementById("detailOverlay").classList.add("open");
   }

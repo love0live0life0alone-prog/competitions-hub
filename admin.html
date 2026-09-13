@@ -177,6 +177,20 @@
     background:var(--gold); color:var(--navy-950); font-weight:700; font-size:13.5px; cursor:pointer; font-family:inherit;
   }
   .save-btn.outline{ background:transparent; border:1px solid rgba(255,255,255,0.25); color:#fff; }
+  .media-thumb{ position:relative; width:76px; height:76px; border-radius:8px; overflow:hidden; border:1px solid var(--line); }
+  .media-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .media-thumb .rm{
+    position:absolute; top:2px; inset-inline-end:2px; width:20px; height:20px; border-radius:50%;
+    background:rgba(198,72,60,0.9); color:#fff; border:none; font-size:12px; cursor:pointer; line-height:1;
+  }
+  .media-thumb .mv{
+    position:absolute; bottom:2px; display:flex; gap:2px; width:100%; justify-content:center;
+  }
+  .media-thumb .mv button{
+    width:18px; height:18px; border-radius:4px; border:none; background:rgba(13,23,39,0.75); color:#fff;
+    font-size:10px; cursor:pointer; line-height:1;
+  }
+  .media-thumb.uploading{ opacity:.5; }
   .logout-btn{
     margin-top:auto; padding-top:16px; text-align:center; font-size:13px;
     color:rgba(255,255,255,0.55); background:none; border:none; cursor:pointer; font-family:inherit;
@@ -304,6 +318,13 @@
         <p style="font-size:12px;color:var(--ink-soft);margin:-10px 0 14px;line-height:1.6;" id="hintWhatsapp">
           Shown to the student as a "Join group" button right after they register — if the competition needs an external form, send it in the group after members join.
         </p>
+        <div class="field">
+          <label id="lblMediaSection">Competition Media</label>
+          <input type="file" id="fMediaInput" accept="image/*" multiple style="display:none;">
+          <button type="button" class="btn secondary small" id="addPhotosBtn" style="width:100%;">+ <span id="addPhotosLabel">Add Photos</span></button>
+          <div id="mediaGrid" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;"></div>
+        </div>
+
         <div class="row-between">
           <button type="button" class="btn secondary" id="cancelCompBtn">Cancel</button>
           <button type="submit" class="btn" id="submitCompBtn">Publish Competition</button>
@@ -369,8 +390,11 @@
   import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
   import {
     getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addDoc,
-    updateDoc, where, getDocs, serverTimestamp
+    updateDoc, deleteDoc, where, getDocs, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import {
+    getStorage, ref, uploadBytes, getDownloadURL, deleteObject
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
   // TODO: same Firebase config as index.html / home.html
   const firebaseConfig = {
@@ -385,6 +409,7 @@
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
+  const storage = getStorage(app);
 
   let competitions = [];
   let allInteractions = [];
@@ -1010,10 +1035,159 @@
     });
   }
 
+  // ---------- Competition media (photos) ----------
+  let mediaItems = []; // current competition's media docs, kept in sync while the modal is open
+  let mediaCompId = null; // set once the competition exists (published) so uploads have somewhere to attach
+
+  async function loadMediaFor(competitionId) {
+    mediaCompId = competitionId;
+    if (!competitionId) { mediaItems = []; renderMediaGrid(); return; }
+    const q = query(collection(db, "competitions", competitionId, "media"), orderBy("order", "asc"));
+    const snap = await getDocs(q);
+    mediaItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderMediaGrid();
+  }
+
+  function renderMediaGrid() {
+    const grid = document.getElementById("mediaGrid");
+    grid.innerHTML = mediaItems.map((m, i) => `
+      <div class="media-thumb" data-id="${m.id}">
+        <img src="${m.url}" alt="">
+        <button type="button" class="rm" data-remove="${m.id}">✕</button>
+        <div class="mv">
+          ${i > 0 ? `<button type="button" data-move="${m.id}" data-dir="-1">◀</button>` : ""}
+          ${i < mediaItems.length - 1 ? `<button type="button" data-move="${m.id}" data-dir="1">▶</button>` : ""}
+        </div>
+      </div>`).join("");
+
+    grid.querySelectorAll("[data-remove]").forEach(btn =>
+      btn.addEventListener("click", () => deleteMediaItem(btn.dataset.remove)));
+    grid.querySelectorAll("[data-move]").forEach(btn =>
+      btn.addEventListener("click", () => moveMediaItem(btn.dataset.move, Number(btn.dataset.dir))));
+  }
+
+  // Validates a reasonable image before ever touching the network.
+  function isValidImageFile(file) {
+    const okTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!okTypes.includes(file.type)) return false;
+    if (file.size > 8 * 1024 * 1024) return false; // 8MB cap
+    return true;
+  }
+
+  // Downscales large photos client-side before upload so the gallery never
+  // depends on downloading huge originals just to show a feed thumbnail.
+  function compressImage(file, maxDim = 1600, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(url);
+          resolve(blob || file);
+        }, "image/jpeg", quality);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("invalid image")); };
+      img.src = url;
+    });
+  }
+
+  document.getElementById("addPhotosBtn").addEventListener("click", () => {
+    if (!mediaCompId) {
+      alert(currentLang === "ar"
+        ? "من فضلك انشر المسابقة الأول قبل ما تضيف صور."
+        : "Please publish the competition first before adding photos.");
+      return;
+    }
+    document.getElementById("fMediaInput").click();
+  });
+
+  document.getElementById("fMediaInput").addEventListener("change", async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ""; // allow re-selecting the same file later
+    for (const file of files) {
+      if (!isValidImageFile(file)) {
+        alert(currentLang === "ar"
+          ? `الملف "${file.name}" مش صورة مدعومة أو حجمه أكبر من 8MB.`
+          : `"${file.name}" isn't a supported image or is larger than 8MB.`);
+        continue;
+      }
+      await uploadOneMedia(file);
+    }
+  });
+
+  async function uploadOneMedia(file) {
+    const placeholder = { id: `_pending_${Date.now()}`, url: URL.createObjectURL(file), _pending: true };
+    mediaItems.push(placeholder);
+    renderMediaGrid();
+
+    try {
+      const blob = await compressImage(file);
+      const mediaId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const storagePath = `competition-media/${mediaCompId}/${mediaId}.jpg`;
+      const storageRef = ref(storage, storagePath);
+      await uploadBytes(storageRef, blob, { contentType: "image/jpeg" });
+      const url = await getDownloadURL(storageRef);
+
+      const order = mediaItems.filter(m => !m._pending).length;
+      await addDoc(collection(db, "competitions", mediaCompId, "media"), {
+        url, storagePath, caption: "", order,
+        uploadedAt: serverTimestamp(), uploadedBy: auth.currentUser.uid,
+      });
+      await loadMediaFor(mediaCompId);
+    } catch (err) {
+      console.error("upload error:", err);
+      mediaItems = mediaItems.filter(m => m.id !== placeholder.id);
+      renderMediaGrid();
+      alert(currentLang === "ar" ? "حصل خطأ أثناء رفع الصورة." : "Something went wrong uploading the photo.");
+    }
+  }
+
+  async function deleteMediaItem(mediaId) {
+    const item = mediaItems.find(m => m.id === mediaId);
+    if (!item) return;
+    if (!confirm(currentLang === "ar" ? "تحذف الصورة دي؟" : "Delete this photo?")) return;
+    try {
+      // Delete Firestore metadata first — if Storage deletion then fails
+      // (e.g. offline), the image is already gone from every UI and just
+      // becomes an orphaned Storage object, which is harmless and can be
+      // cleaned up later; the reverse order could leave a broken image
+      // reference visible to students, which is worse.
+      await deleteDoc(doc(db, "competitions", mediaCompId, "media", mediaId));
+      if (item.storagePath) {
+        await deleteObject(ref(storage, item.storagePath)).catch(() => {});
+      }
+      await loadMediaFor(mediaCompId);
+    } catch (err) {
+      console.error("delete media error:", err);
+    }
+  }
+
+  async function moveMediaItem(mediaId, dir) {
+    const idx = mediaItems.findIndex(m => m.id === mediaId);
+    const swapIdx = idx + dir;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= mediaItems.length) return;
+    const a = mediaItems[idx], b = mediaItems[swapIdx];
+    await Promise.all([
+      updateDoc(doc(db, "competitions", mediaCompId, "media", a.id), { order: swapIdx }),
+      updateDoc(doc(db, "competitions", mediaCompId, "media", b.id), { order: idx }),
+    ]);
+    await loadMediaFor(mediaCompId);
+  }
+
   // ---------- Create competition modal ----------
   document.getElementById("newCompBtn").addEventListener("click", () => {
     editingId = null;
     document.getElementById("compForm").reset();
+    loadMediaFor(null);
     document.getElementById("compModalScrim").classList.add("show");
   });
   document.getElementById("cancelCompBtn").addEventListener("click", () =>
@@ -1035,11 +1209,20 @@
     // Publishing goes through the Flask API so the push-notification
     // fan-out to students happens server-side (see backend/app.py).
     const token = await auth.currentUser.getIdToken();
-    await fetch(`${API_BASE}/api/competitions`, {
+    const res = await fetch(`${API_BASE}/api/competitions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
       body: JSON.stringify(payload)
     });
+    const result = await res.json();
+
+    // Now that the competition has an id, photos can be attached — the
+    // admin can keep the modal open and start adding photos immediately
+    // instead of having to reopen an "edit" flow that doesn't exist yet.
+    if (result.id) {
+      mediaCompId = result.id;
+      document.getElementById("addPhotosBtn").disabled = false;
+    }
 
     document.getElementById("compModalScrim").classList.remove("show");
   });

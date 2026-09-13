@@ -34,6 +34,12 @@ service cloud.firestore {
     match /competitions/{competitionId} {
       allow read: if isUniversityAccount();
       allow write: if isAdmin(); // creation/edits go through the Flask API, but this backstops direct writes
+
+      // ---- competition media (photo gallery) ----
+      match /media/{mediaId} {
+        allow read: if isUniversityAccount();
+        allow write: if isAdmin();
+      }
     }
 
     // ---- competition_interactions ----
