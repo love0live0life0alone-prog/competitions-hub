@@ -192,6 +192,20 @@
   @media (display-mode: standalone){
     html, body{ overscroll-behavior-y: contain; }
   }
+
+  /* ---------- Prevent accidental long-press text selection ----------
+     A stray long-press on a label/heading otherwise triggers Android's
+     "select text → search with Google" bar at the bottom of the screen.
+     Inputs/textareas stay selectable so typing/editing still works normally. */
+  body{
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  input, textarea, select{
+    -webkit-user-select: text;
+    user-select: text;
+  }
 </style>
 </head>
 <body>

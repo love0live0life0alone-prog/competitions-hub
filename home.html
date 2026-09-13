@@ -337,6 +337,16 @@
   @media (display-mode: standalone){
     html, body{ overscroll-behavior-y: contain; }
   }
+  /* ---------- Prevent accidental long-press text selection ---------- */
+  body{
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  input, textarea, select{
+    -webkit-user-select: text;
+    user-select: text;
+  }
 </style>
 </head>
 <body>
