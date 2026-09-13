@@ -181,6 +181,11 @@
     margin-top:auto; padding-top:16px; text-align:center; font-size:13px;
     color:rgba(255,255,255,0.55); background:none; border:none; cursor:pointer; font-family:inherit;
   }
+
+  /* ---------- Disable browser pull-to-refresh in the installed PWA only ---------- */
+  @media (display-mode: standalone){
+    html, body{ overscroll-behavior-y: contain; }
+  }
 </style>
 </head>
 <body>

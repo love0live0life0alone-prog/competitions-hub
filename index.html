@@ -270,6 +270,11 @@
   @media (prefers-reduced-motion: reduce){
     [data-anim]{ opacity:1 !important; transform:none !important; }
   }
+
+  /* ---------- Disable browser pull-to-refresh in the installed PWA only ---------- */
+  @media (display-mode: standalone){
+    html, body{ overscroll-behavior-y: contain; }
+  }
 </style>
 </head>
 <body>

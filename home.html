@@ -317,9 +317,33 @@
     font-weight:700; font-size:14.5px; margin-bottom:10px;
   }
   .cta-whatsapp svg{ width:19px; height:19px; fill:#fff; flex:none; }
+
+  /* ---------- Auth gate splash (prevents login/content flash) ---------- */
+  .auth-gate{
+    position:fixed; inset:0; z-index:999;
+    background:var(--navy-900);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .auth-gate img{
+    width:64px; height:64px; border-radius:16px;
+    animation:authGatePulse 1.1s ease-in-out infinite;
+  }
+  @keyframes authGatePulse{
+    0%,100%{ opacity:.55; transform:scale(.94); }
+    50%{ opacity:1; transform:scale(1); }
+  }
+
+  /* ---------- Disable browser pull-to-refresh in the installed PWA only ---------- */
+  @media (display-mode: standalone){
+    html, body{ overscroll-behavior-y: contain; }
+  }
 </style>
 </head>
 <body>
+
+  <div class="auth-gate" id="authGate">
+    <img src="icon-192.png" alt="">
+  </div>
 
   <header class="topbar">
     <div class="left">
@@ -547,6 +571,10 @@
     listenToCompetitions();
     registerPushToken();
     openFromUrlIfNeeded();
+
+    // Auth state is resolved and the user is valid — safe to reveal the app now.
+    const gate = document.getElementById("authGate");
+    if (gate) gate.style.display = "none";
   });
 
   async function registerPushToken() {

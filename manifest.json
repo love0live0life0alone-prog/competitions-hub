@@ -2,7 +2,7 @@
   "name": "ملتقى مسابقات الجامعة",
   "short_name": "المسابقات",
   "description": "تطبيق لمتابعة مسابقات الجامعة وإعلاناتها ومواعيدها ونتائجها",
-  "start_url": "./index.html",
+  "start_url": "./home.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
