@@ -522,7 +522,7 @@
   let idToken = null;
   let competitions = [];
   let activeFilter = "all";
-  let current = localStorage.getItem("uch_lang") || "ar";
+  let current = localStorage.getItem("uch_lang") === "ar" ? "ar" : "en";
   let currentDetailId = null;
   let regParticipationType = "individual";
 

@@ -538,7 +538,7 @@
 
   // Keep whichever language the person last chose (on this page or home.html).
   const savedLang = localStorage.getItem("uch_lang");
-  if (savedLang && savedLang !== current) applyLang(savedLang);
+  applyLang(savedLang === "ar" ? "ar" : "en");
 
   // ---------- Tabs ----------
   document.getElementById("tabSignin").addEventListener("click", () => switchTab("signin"));
