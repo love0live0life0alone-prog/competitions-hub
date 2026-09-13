@@ -656,7 +656,9 @@
   function listenToCompetitions() {
     const q = query(collection(db, "competitions"), orderBy("createdAt", "desc"));
     onSnapshot(q, (snap) => {
-      competitions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Competitions soft-deleted by an admin stay in Firestore (with all
+      // their data) but must never show up in the student feed.
+      competitions = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.deleted);
       renderFeed();
     });
   }

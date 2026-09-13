@@ -879,10 +879,13 @@
       }
     });
 
+    const activeCompIds = new Set(comps.map(c => c.id));
+
     const byStudent = {};
     studentDetailsMap = {};
     allInteractions.forEach((data) => {
       if (!data.formSubmittedAt) return; // only count/list completed registrations
+      if (!activeCompIds.has(data.competitionId)) return; // skip interactions tied to a deleted competition
       if (!byStudent[data.studentId]) byStudent[data.studentId] = { submissions: 0 };
       byStudent[data.studentId].submissions++;
 
