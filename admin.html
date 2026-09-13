@@ -1173,11 +1173,15 @@
     Object.values(studentDetailsMap).forEach(list =>
       list.sort((a, b) => (a.rank ? a.rank : 999) - (b.rank ? b.rank : 999)));
 
-    const entries = await Promise.all(Object.entries(byStudent).map(async ([uid, v]) => {
+    const entriesRaw = await Promise.all(Object.entries(byStudent).map(async ([uid, v]) => {
       const uSnap = await getDoc(doc(db, "users", uid));
-      const name = uSnap.exists() ? uSnap.data().fullName : uid;
-      return { uid, name, submissions: v.submissions };
+      // The user account behind this uid was deleted (e.g. recreated with a
+      // new account) — no real name to show, so skip it from the board
+      // instead of leaking the raw uid string.
+      if (!uSnap.exists()) return null;
+      return { uid, name: uSnap.data().fullName || uid, submissions: v.submissions };
     }));
+    const entries = entriesRaw.filter(Boolean);
 
     entries.sort((a, b) => b.submissions - a.submissions);
     const top = entries.slice(0, 10);
@@ -1191,16 +1195,17 @@
 
     // Winners leaderboard: tally rank appearances across closed competitions,
     // grouped by studentId (not name) — safe against duplicate/similar names.
-    const winEntries = await Promise.all(
+    const winEntriesRaw = await Promise.all(
       Object.entries(winCounts)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .map(async ([studentId, count]) => {
           const uSnap = await getDoc(doc(db, "users", studentId));
-          const name = uSnap.exists() ? uSnap.data().fullName : studentId;
-          return { studentId, name, count };
+          if (!uSnap.exists()) return null;
+          return { studentId, name: uSnap.data().fullName || studentId, count };
         })
     );
+    const winEntries = winEntriesRaw.filter(Boolean);
     document.getElementById("lbWinners").innerHTML = winEntries.map(({ studentId, name, count }, i) => `
       <div class="lb-row lb-row-clickable" data-uid="${studentId}" data-name="${name.replace(/"/g, "&quot;")}" data-mode="winners">
         <span class="lb-rank ${i === 0 ? "gold" : ""}">${i + 1}</span>
