@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>لوحة تحكم المسؤولين</title>
+<title id="pageTitleTag">Admin Dashboard</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#14213D">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="لوحة تحكم المسؤولين">
+<meta name="apple-mobile-web-app-title" content="Admin Dashboard">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
@@ -181,6 +181,12 @@
     margin-top:auto; padding-top:16px; text-align:center; font-size:13px;
     color:rgba(255,255,255,0.55); background:none; border:none; cursor:pointer; font-family:inherit;
   }
+  .lang-row{ display:flex; gap:8px; }
+  .lang-row button{
+    flex:1; padding:9px; border-radius:9px; border:1px solid rgba(255,255,255,0.18);
+    background:transparent; color:rgba(255,255,255,0.75); font-size:13px; cursor:pointer; font-family:inherit;
+  }
+  .lang-row button.active{ background:rgba(255,255,255,0.14); color:#fff; border-color:rgba(255,255,255,0.3); }
 
   /* ---------- Disable browser pull-to-refresh in the installed PWA only ---------- */
   @media (display-mode: standalone){
@@ -195,7 +201,7 @@
       <button class="icon-btn" id="menuBtn" aria-label="menu">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
-      <h1>لوحة تحكم — رعاية الشباب</h1>
+      <h1 id="topbarTitle">Student Affairs — Admin Dashboard</h1>
     </div>
     <span class="badge-admin">Admin</span>
   </header>
@@ -211,42 +217,50 @@
     </div>
 
     <a href="home.html" class="back-link">
-      <span>🎓 واجهة الطالب</span>
+      <span id="backToStudentLabel">🎓 Student View</span>
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
     </a>
 
     <div class="side-section">
-      <p class="side-label">المسابقات</p>
-      <button class="save-btn outline" id="trashBtn">🗑️ المسابقات المحذوفة (<span id="trashCount">0</span>)</button>
+      <p class="side-label" id="lblLangSection">Language</p>
+      <div class="lang-row">
+        <button data-lang="en" id="btnLangEn">English</button>
+        <button data-lang="ar" id="btnLangAr">العربية</button>
+      </div>
     </div>
 
     <div class="side-section">
-      <p class="side-label">التطبيق</p>
-      <button class="save-btn" id="installAppBtn" style="margin-bottom:8px;">📲 تثبيت التطبيق</button>
-      <button class="save-btn outline" id="forceUpdateBtn">🔄 تحديث فوري (مسح الكاش)</button>
+      <p class="side-label" id="lblCompsSection">Competitions</p>
+      <button class="save-btn outline" id="trashBtn"><span id="trashLabel">🗑️ Deleted Competitions</span> (<span id="trashCount">0</span>)</button>
     </div>
 
-    <button class="logout-btn" id="sidebarLogoutBtn">تسجيل الخروج</button>
+    <div class="side-section">
+      <p class="side-label" id="lblAppSection">App</p>
+      <button class="save-btn" id="installAppBtn" style="margin-bottom:8px;"><span id="installBtnLabel">📲 Install App</span></button>
+      <button class="save-btn outline" id="forceUpdateBtn"><span id="updateBtnLabel">🔄 Force Update (Clear Cache)</span></button>
+    </div>
+
+    <button class="logout-btn" id="sidebarLogoutBtn">Sign Out</button>
   </aside>
 
   <nav class="tabs">
-    <div class="tab active" data-tab="comps">المسابقات والإحصائيات</div>
-    <div class="tab" data-tab="lb">الأكثر تفوقًا</div>
+    <div class="tab active" data-tab="comps" id="tabCompsLabel">Competitions & Stats</div>
+    <div class="tab" data-tab="lb" id="tabLbLabel">Top Performers</div>
   </nav>
 
   <div class="container">
     <div class="panel" id="tabComps">
       <div class="row-between">
-        <strong style="font-size:13.5px;color:var(--ink-soft);">إجمالي المسابقات: <span id="totalCount">0</span></strong>
-        <button class="btn" id="newCompBtn">+ إعلان مسابقة جديدة</button>
+        <strong style="font-size:13.5px;color:var(--ink-soft);"><span id="lblTotalComps">Total competitions:</span> <span id="totalCount">0</span></strong>
+        <button class="btn" id="newCompBtn">+ <span id="newCompBtnLabel">New Competition</span></button>
       </div>
       <div id="compList"><!-- injected --></div>
     </div>
 
     <div class="panel" id="tabLb" style="display:none;">
-      <h3 style="margin-top:0;font-family:'Space Grotesk',sans-serif;">🏅 الأكثر مشاركة</h3>
+      <h3 style="margin-top:0;font-family:'Space Grotesk',sans-serif;" id="lbParticipationTitle">🏅 Most Active</h3>
       <div id="lbParticipation"></div>
-      <h3 style="font-family:'Space Grotesk',sans-serif;">🏆 الأكثر حصولًا على مراكز</h3>
+      <h3 style="font-family:'Space Grotesk',sans-serif;" id="lbWinnersTitle">🏆 Top Winners</h3>
       <div id="lbWinners"></div>
     </div>
   </div>
@@ -254,31 +268,31 @@
   <!-- ---------- Create/Edit competition modal ---------- -->
   <div class="modal-scrim" id="compModalScrim">
     <div class="modal">
-      <h2 id="compModalTitle">إعلان مسابقة جديدة</h2>
+      <h2 id="compModalTitle">New Competition</h2>
       <form id="compForm">
-        <div class="field"><label>عنوان المسابقة</label><input type="text" id="fTitle" required></div>
-        <div class="field"><label>الوصف الكامل (التفاصيل، شروط التقديم...)</label><textarea id="fDesc" required></textarea></div>
-        <div class="field"><label>لينك المسابقة</label><input type="url" id="fLink" required></div>
-        <div class="field"><label>الموعد النهائي للمسابقة ككل (نتيجة/فعالية المسابقة)</label><input type="datetime-local" id="fDeadline" required></div>
+        <div class="field"><label id="lblFTitle">Competition title</label><input type="text" id="fTitle" required></div>
+        <div class="field"><label id="lblFDesc">Full description (details, application conditions...)</label><textarea id="fDesc" required></textarea></div>
+        <div class="field"><label id="lblFLink">Competition link</label><input type="url" id="fLink" required></div>
+        <div class="field"><label id="lblFDeadline">Overall competition deadline (results/event date)</label><input type="datetime-local" id="fDeadline" required></div>
         <div class="field">
-          <label>آخر موعد للتقديم</label>
+          <label id="lblFAppDeadline">Application deadline</label>
           <input type="datetime-local" id="fAppDeadline" required>
         </div>
-        <p style="font-size:12px;color:var(--ink-soft);margin:-10px 0 14px;line-height:1.6;">
-          الموعدين منفصلين — تقدر تجدّد آخر موعد للتقديم في أي وقت بعد النشر من زرار "تجديد ميعاد التقديم" على المسابقة، من غير ما تغيّر ميعاد المسابقة ككل.
+        <p style="font-size:12px;color:var(--ink-soft);margin:-10px 0 14px;line-height:1.6;" id="hintDeadlines">
+          The two dates are separate — you can renew the application deadline any time after publishing using the "Renew deadline" button on the competition, without changing the overall competition date.
         </p>
-        <div class="field"><label>مرفق PDF/Word (رابط بعد الرفع على Firebase Storage)</label><input type="text" id="fAttachUrl" placeholder="https://..."></div>
-        <div class="field"><label>اسم الملف المعروض</label><input type="text" id="fAttachName" placeholder="تفاصيل_المسابقة.pdf"></div>
+        <div class="field"><label id="lblFAttachUrl">PDF/Word attachment (URL after uploading to Firebase Storage)</label><input type="text" id="fAttachUrl" placeholder="https://..."></div>
+        <div class="field"><label id="lblFAttachName">Displayed file name</label><input type="text" id="fAttachName" placeholder="competition_details.pdf"></div>
         <div class="field">
-          <label>لينك جروب الواتساب الخاص بالمسابقة (اختياري)</label>
+          <label id="lblFWhatsapp">Competition WhatsApp group link (optional)</label>
           <input type="text" id="fWhatsapp" placeholder="https://chat.whatsapp.com/xxxxxxxx">
         </div>
-        <p style="font-size:12px;color:var(--ink-soft);margin:-10px 0 14px;line-height:1.6;">
-          بيظهر للطالب كزرار "انضم للجروب" فور ما يسجل بياناته في المسابقة — لو المسابقة محتاجة فورم خارجي (من جهة تانية)، ابعته على الجروب نفسه بعد ما الأعضاء ينضموا.
+        <p style="font-size:12px;color:var(--ink-soft);margin:-10px 0 14px;line-height:1.6;" id="hintWhatsapp">
+          Shown to the student as a "Join group" button right after they register — if the competition needs an external form, send it in the group after members join.
         </p>
         <div class="row-between">
-          <button type="button" class="btn secondary" id="cancelCompBtn">إلغاء</button>
-          <button type="submit" class="btn" id="submitCompBtn">نشر المسابقة</button>
+          <button type="button" class="btn secondary" id="cancelCompBtn">Cancel</button>
+          <button type="submit" class="btn" id="submitCompBtn">Publish Competition</button>
         </div>
       </form>
     </div>
@@ -287,12 +301,12 @@
   <!-- ---------- Renew application deadline modal ---------- -->
   <div class="modal-scrim" id="renewModalScrim">
     <div class="modal">
-      <h2>تجديد آخر موعد للتقديم</h2>
-      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">الموعد النهائي للمسابقة ككل مش هيتأثر — التعديل ده خاص بميعاد التقديم بس.</p>
-      <div class="field"><label>آخر موعد جديد للتقديم</label><input type="datetime-local" id="fRenewAppDeadline" required></div>
+      <h2 id="renewModalTitle">Renew Application Deadline</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;" id="renewModalHint">The overall competition deadline won't be affected — this only changes the application deadline.</p>
+      <div class="field"><label id="lblFRenewAppDeadline">New application deadline</label><input type="datetime-local" id="fRenewAppDeadline" required></div>
       <div class="row-between">
-        <button type="button" class="btn secondary" id="cancelRenewBtn">إلغاء</button>
-        <button type="button" class="btn" id="confirmRenewBtn">حفظ الموعد الجديد</button>
+        <button type="button" class="btn secondary" id="cancelRenewBtn">Cancel</button>
+        <button type="button" class="btn" id="confirmRenewBtn">Save New Date</button>
       </div>
     </div>
   </div>
@@ -300,11 +314,11 @@
   <!-- ---------- Student participation/results drill-down modal ---------- -->
   <div class="modal-scrim" id="winnerDetailModalScrim">
     <div class="modal">
-      <h2>مسابقات <span id="winnerDetailName">—</span></h2>
-      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">كل المسابقات اللي اشترك فيها، والمركز لو حصل على واحد، وكان فردي ولا جماعي، وهل كان معاه مشرف.</p>
+      <h2><span id="winnerDetailTitlePrefix">Competitions of</span> <span id="winnerDetailName">—</span></h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;" id="winnerDetailHint">Every competition they joined, their rank if any, whether it was individual or team, and whether they had a supervisor.</p>
       <div id="winnerDetailList"></div>
       <div class="row-between" style="margin-top:18px;justify-content:flex-end;">
-        <button type="button" class="btn secondary" id="closeWinnerDetailBtn">إغلاق</button>
+        <button type="button" class="btn secondary" id="closeWinnerDetailBtn">Close</button>
       </div>
     </div>
   </div>
@@ -312,11 +326,11 @@
   <!-- ---------- Deleted competitions (trash) modal ---------- -->
   <div class="modal-scrim" id="trashModalScrim">
     <div class="modal">
-      <h2>المسابقات المحذوفة</h2>
-      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">اتحذفت من القائمة الرئيسية بس بياناتها محفوظة بالكامل — تقدر تسترجع أي مسابقة في أي وقت.</p>
+      <h2 id="trashModalTitle">Deleted Competitions</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;" id="trashModalHint">Removed from the main list but their data is fully preserved — you can restore any competition anytime.</p>
       <div id="trashList"></div>
       <div class="row-between" style="margin-top:18px;justify-content:flex-end;">
-        <button type="button" class="btn secondary" id="closeTrashBtn">إغلاق</button>
+        <button type="button" class="btn secondary" id="closeTrashBtn">Close</button>
       </div>
     </div>
   </div>
@@ -324,13 +338,13 @@
   <!-- ---------- Close competition / winners modal ---------- -->
   <div class="modal-scrim" id="winModalScrim">
     <div class="modal">
-      <h2>إغلاق المسابقة وإعلان النتائج</h2>
-      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">أضف الفائزين بالترتيب — هيظهروا للطلبة فورًا بعد الحفظ.</p>
+      <h2 id="winModalTitle">Close Competition & Announce Results</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;" id="winModalHint">Add winners in order — they'll appear to students immediately after saving.</p>
       <div id="winnerInputs"></div>
-      <button type="button" class="btn secondary small" id="addWinnerRowBtn">+ إضافة فائز</button>
+      <button type="button" class="btn secondary small" id="addWinnerRowBtn">+ <span id="addWinnerRowLabel">Add Winner</span></button>
       <div class="row-between" style="margin-top:18px;">
-        <button type="button" class="btn secondary" id="cancelWinBtn">إلغاء</button>
-        <button type="button" class="btn danger" id="confirmCloseBtn">تأكيد الإغلاق ونشر النتائج</button>
+        <button type="button" class="btn secondary" id="cancelWinBtn">Cancel</button>
+        <button type="button" class="btn danger" id="confirmCloseBtn">Confirm & Publish Results</button>
       </div>
     </div>
   </div>
@@ -362,6 +376,261 @@
   let allInteractions = [];
   let editingId = null;
   let closingId = null;
+
+  // ---------- i18n ----------
+  const STR = {
+    en: {
+      topbarTitle: "Student Affairs — Admin Dashboard",
+      backToStudent: "🎓 Student View",
+      langSection: "Language",
+      compsSection: "Competitions",
+      trashLabel: "🗑️ Deleted Competitions",
+      appSection: "App",
+      installBtn: "📲 Install App",
+      updateBtn: "🔄 Force Update (Clear Cache)",
+      logoutBtn: "Sign Out",
+      tabComps: "Competitions & Stats",
+      tabLb: "Top Performers",
+      totalComps: "Total competitions:",
+      newCompBtn: "New Competition",
+      lbParticipationTitle: "🏅 Most Active",
+      lbWinnersTitle: "🏆 Top Winners",
+      pageTitle: "Admin Dashboard",
+      emptyComps: "No competitions yet — add your first announcement.",
+      statusOpen: "Open",
+      statusClosed: "Closed",
+      statusDeleted: "Deleted",
+      funnelViewed: "Viewed announcement",
+      funnelClicked: "Clicked link",
+      funnelSubmitted: "Submitted form",
+      funnelCompleted: "Completed",
+      deadlineAppPrefix: "Application deadline:",
+      deadlineFinalPrefix: "Final competition date:",
+      btnFollowUp: "Track students",
+      btnRenew: "Renew deadline",
+      btnClose: "Close & publish results",
+      btnReopen: "Reopen",
+      btnDelete: "🗑️ Delete",
+      btnRestore: "↩️ Restore competition",
+      emptyStudents: "No students have submitted the form yet.",
+      typeTeam: "🧑‍🤝‍🧑 Team",
+      typeIndividual: "🧑 Individual",
+      supervisorPrefix: "Supervisor:",
+      notesPrefix: "Notes:",
+      waJoined: "Joined WhatsApp group",
+      waNotJoined: "Not joined yet",
+      followRegistered: "Registered",
+      followInProgress: "In progress",
+      followCompleted: "Completed",
+      followDropped: "Dropped",
+      deleteConfirm: (title) => `Are you sure you want to delete "${title}"?\nYou can restore it anytime from "Deleted Competitions" in the sidebar.`,
+      trashEmpty: "Trash is empty.",
+      deletedAtPrefix: "Deleted on:",
+      compModalTitle: "New Competition",
+      lblFTitle: "Competition title",
+      lblFDesc: "Full description (details, application conditions...)",
+      lblFLink: "Competition link",
+      lblFDeadline: "Overall competition deadline (results/event date)",
+      lblFAppDeadline: "Application deadline",
+      hintDeadlines: 'The two dates are separate — you can renew the application deadline any time after publishing using the "Renew deadline" button on the competition, without changing the overall competition date.',
+      lblFAttachUrl: "PDF/Word attachment (URL after uploading to Firebase Storage)",
+      lblFAttachName: "Displayed file name",
+      attachNamePlaceholder: "competition_details.pdf",
+      lblFWhatsapp: "Competition WhatsApp group link (optional)",
+      hintWhatsapp: 'Shown to the student as a "Join group" button right after they register — if the competition needs an external form, send it in the group after members join.',
+      cancel: "Cancel",
+      publishComp: "Publish Competition",
+      renewModalTitle: "Renew Application Deadline",
+      renewModalHint: "The overall competition deadline won't be affected — this only changes the application deadline.",
+      lblFRenewAppDeadline: "New application deadline",
+      saveNewDate: "Save New Date",
+      winnerDetailTitlePrefix: "Competitions of",
+      winnerDetailHint: "Every competition they joined, their rank if any, whether it was individual or team, and whether they had a supervisor.",
+      close: "Close",
+      rankLabel: (r) => `Placed #${r}`,
+      noRankLabel: "Participated without placing",
+      typeUnknown: "Unknown",
+      supervisorWith: (s) => `Supervisor: ${s}`,
+      supervisorWithout: "No supervisor",
+      noDetails: "No details available.",
+      trashModalTitle: "Deleted Competitions",
+      trashModalHint: "Removed from the main list but their data is fully preserved — you can restore any competition anytime.",
+      winModalTitle: "Close Competition & Announce Results",
+      winModalHint: "Add winners in order — they'll appear to students immediately after saving.",
+      addWinnerRow: "Add Winner",
+      confirmClose: "Confirm & Publish Results",
+      loadingStudents: "Loading students who submitted the form...",
+      noSubmittedYet: "No students have submitted the form yet — you can't pick winners before there are registrations.",
+      selectWinnerPlaceholder: "Select the winning student",
+      alertPickWinner: "Select at least one winning student before confirming.",
+      lbParticipationSub: "Registered entries — tap for details",
+      lbWinnersSub: "Has placed — tap for details",
+      unitCompetition: "entries",
+      unitRank: "wins",
+      noDataYet: "Not enough data yet.",
+      noResultsYet: "No results announced yet.",
+      installAlready: "The app is already installed on your device ✅",
+      installManual: 'If you don\'t see an automatic install option, tap the browser\'s share/menu button and choose "Add to Home Screen".',
+      dateLocale: "en-GB",
+    },
+    ar: {
+      topbarTitle: "لوحة تحكم — رعاية الشباب",
+      backToStudent: "🎓 واجهة الطالب",
+      langSection: "اللغة",
+      compsSection: "المسابقات",
+      trashLabel: "🗑️ المسابقات المحذوفة",
+      appSection: "التطبيق",
+      installBtn: "📲 تثبيت التطبيق",
+      updateBtn: "🔄 تحديث فوري (مسح الكاش)",
+      logoutBtn: "تسجيل الخروج",
+      tabComps: "المسابقات والإحصائيات",
+      tabLb: "الأكثر تفوقًا",
+      totalComps: "إجمالي المسابقات:",
+      newCompBtn: "إعلان مسابقة جديدة",
+      lbParticipationTitle: "🏅 الأكثر مشاركة",
+      lbWinnersTitle: "🏆 الأكثر حصولًا على مراكز",
+      pageTitle: "لوحة تحكم المسؤولين",
+      emptyComps: "لسه مفيش مسابقات — ابدأ بإضافة أول إعلان.",
+      statusOpen: "مفتوحة",
+      statusClosed: "منتهية",
+      statusDeleted: "محذوفة",
+      funnelViewed: "شاهدوا الإعلان",
+      funnelClicked: "دخلوا اللينك",
+      funnelSubmitted: "قدّموا الفورم",
+      funnelCompleted: "كملوا للنهاية",
+      deadlineAppPrefix: "آخر موعد للتقديم:",
+      deadlineFinalPrefix: "الموعد النهائي للمسابقة:",
+      btnFollowUp: "متابعة الطلبة",
+      btnRenew: "تجديد ميعاد التقديم",
+      btnClose: "إغلاق المسابقة + نتائج",
+      btnReopen: "إعادة فتح",
+      btnDelete: "🗑️ حذف",
+      btnRestore: "↩️ استرجاع المسابقة",
+      emptyStudents: "لسه مفيش طلبة قدّموا الفورم.",
+      typeTeam: "🧑‍🤝‍🧑 فريق",
+      typeIndividual: "🧑 فردي",
+      supervisorPrefix: "مشرف:",
+      notesPrefix: "ملاحظات:",
+      waJoined: "منضم لجروب الواتساب",
+      waNotJoined: "لسه مش منضم للجروب",
+      followRegistered: "مسجّل",
+      followInProgress: "مستمر",
+      followCompleted: "كمّل للنهاية",
+      followDropped: "انسحب",
+      deleteConfirm: (title) => `متأكد إنك عايز تحذف "${title}"؟\nهتقدر تسترجعها في أي وقت من "المسابقات المحذوفة" في القائمة الجانبية.`,
+      trashEmpty: "سلة المحذوفات فاضية.",
+      deletedAtPrefix: "اتحذفت في:",
+      compModalTitle: "إعلان مسابقة جديدة",
+      lblFTitle: "عنوان المسابقة",
+      lblFDesc: "الوصف الكامل (التفاصيل، شروط التقديم...)",
+      lblFLink: "لينك المسابقة",
+      lblFDeadline: "الموعد النهائي للمسابقة ككل (نتيجة/فعالية المسابقة)",
+      lblFAppDeadline: "آخر موعد للتقديم",
+      hintDeadlines: 'الموعدين منفصلين — تقدر تجدّد آخر موعد للتقديم في أي وقت بعد النشر من زرار "تجديد ميعاد التقديم" على المسابقة، من غير ما تغيّر ميعاد المسابقة ككل.',
+      lblFAttachUrl: "مرفق PDF/Word (رابط بعد الرفع على Firebase Storage)",
+      lblFAttachName: "اسم الملف المعروض",
+      attachNamePlaceholder: "تفاصيل_المسابقة.pdf",
+      lblFWhatsapp: "لينك جروب الواتساب الخاص بالمسابقة (اختياري)",
+      hintWhatsapp: 'بيظهر للطالب كزرار "انضم للجروب" فور ما يسجل بياناته في المسابقة — لو المسابقة محتاجة فورم خارجي (من جهة تانية)، ابعته على الجروب نفسه بعد ما الأعضاء ينضموا.',
+      cancel: "إلغاء",
+      publishComp: "نشر المسابقة",
+      renewModalTitle: "تجديد آخر موعد للتقديم",
+      renewModalHint: "الموعد النهائي للمسابقة ككل مش هيتأثر — التعديل ده خاص بميعاد التقديم بس.",
+      lblFRenewAppDeadline: "آخر موعد جديد للتقديم",
+      saveNewDate: "حفظ الموعد الجديد",
+      winnerDetailTitlePrefix: "مسابقات",
+      winnerDetailHint: "كل المسابقات اللي اشترك فيها، والمركز لو حصل على واحد، وكان فردي ولا جماعي، وهل كان معاه مشرف.",
+      close: "إغلاق",
+      rankLabel: (r) => `حصل على المركز ${r}`,
+      noRankLabel: "شارك من غير ما ياخد مركز",
+      typeUnknown: "غير معروف",
+      supervisorWith: (s) => `مشرف: ${s}`,
+      supervisorWithout: "من غير مشرف",
+      noDetails: "مفيش تفاصيل متاحة.",
+      trashModalTitle: "المسابقات المحذوفة",
+      trashModalHint: "اتحذفت من القائمة الرئيسية بس بياناتها محفوظة بالكامل — تقدر تسترجع أي مسابقة في أي وقت.",
+      winModalTitle: "إغلاق المسابقة وإعلان النتائج",
+      winModalHint: "أضف الفائزين بالترتيب — هيظهروا للطلبة فورًا بعد الحفظ.",
+      addWinnerRow: "إضافة فائز",
+      confirmClose: "تأكيد الإغلاق ونشر النتائج",
+      loadingStudents: "بيتم تحميل الطلبة اللي قدّموا الفورم...",
+      noSubmittedYet: "مفيش طلبة قدّموا الفورم لسه — مينفعش تحدد فائزين قبل ما يكون في تسجيلات.",
+      selectWinnerPlaceholder: "اختر الطالب الفائز",
+      alertPickWinner: "اختر على الأقل طالب فائز واحد قبل التأكيد.",
+      lbParticipationSub: "مشاركات مسجّلة — دوس لعرض التفاصيل",
+      lbWinnersSub: "حصل على مراكز — دوس لعرض التفاصيل",
+      unitCompetition: "مسابقة",
+      unitRank: "مركز",
+      noDataYet: "لا توجد بيانات كافية بعد.",
+      noResultsYet: "لسه مفيش نتائج معلنة.",
+      installAlready: "التطبيق متثبت بالفعل على جهازك ✅",
+      installManual: 'لو مش شايف خيار التثبيت التلقائي، دوس على زرار المشاركة/القائمة في المتصفح واختار "إضافة إلى الشاشة الرئيسية".',
+      dateLocale: "ar-EG",
+    }
+  };
+
+  let currentLang = localStorage.getItem("uch_admin_lang") === "ar" ? "ar" : "en";
+  const t = (key) => STR[currentLang][key];
+
+  function applyLang(code) {
+    currentLang = code;
+    localStorage.setItem("uch_admin_lang", code);
+    document.documentElement.setAttribute("dir", code === "ar" ? "rtl" : "ltr");
+    document.documentElement.setAttribute("lang", code);
+    document.getElementById("pageTitleTag").textContent = t("pageTitle");
+    document.getElementById("topbarTitle").textContent = t("topbarTitle");
+    document.getElementById("backToStudentLabel").textContent = t("backToStudent");
+    document.getElementById("lblLangSection").textContent = t("langSection");
+    document.getElementById("lblCompsSection").textContent = t("compsSection");
+    document.getElementById("trashLabel").textContent = t("trashLabel");
+    document.getElementById("lblAppSection").textContent = t("appSection");
+    document.getElementById("installBtnLabel").textContent = t("installBtn");
+    document.getElementById("updateBtnLabel").textContent = t("updateBtn");
+    document.getElementById("sidebarLogoutBtn").textContent = t("logoutBtn");
+    document.getElementById("tabCompsLabel").textContent = t("tabComps");
+    document.getElementById("tabLbLabel").textContent = t("tabLb");
+    document.getElementById("lblTotalComps").textContent = t("totalComps");
+    document.getElementById("newCompBtnLabel").textContent = t("newCompBtn");
+    document.getElementById("lbParticipationTitle").textContent = t("lbParticipationTitle");
+    document.getElementById("lbWinnersTitle").textContent = t("lbWinnersTitle");
+    document.getElementById("compModalTitle").textContent = t("compModalTitle");
+    document.getElementById("lblFTitle").textContent = t("lblFTitle");
+    document.getElementById("lblFDesc").textContent = t("lblFDesc");
+    document.getElementById("lblFLink").textContent = t("lblFLink");
+    document.getElementById("lblFDeadline").textContent = t("lblFDeadline");
+    document.getElementById("lblFAppDeadline").textContent = t("lblFAppDeadline");
+    document.getElementById("hintDeadlines").textContent = t("hintDeadlines");
+    document.getElementById("lblFAttachUrl").textContent = t("lblFAttachUrl");
+    document.getElementById("lblFAttachName").textContent = t("lblFAttachName");
+    document.getElementById("fAttachName").placeholder = t("attachNamePlaceholder");
+    document.getElementById("lblFWhatsapp").textContent = t("lblFWhatsapp");
+    document.getElementById("hintWhatsapp").textContent = t("hintWhatsapp");
+    document.getElementById("cancelCompBtn").textContent = t("cancel");
+    document.getElementById("submitCompBtn").textContent = t("publishComp");
+    document.getElementById("renewModalTitle").textContent = t("renewModalTitle");
+    document.getElementById("renewModalHint").textContent = t("renewModalHint");
+    document.getElementById("lblFRenewAppDeadline").textContent = t("lblFRenewAppDeadline");
+    document.getElementById("cancelRenewBtn").textContent = t("cancel");
+    document.getElementById("confirmRenewBtn").textContent = t("saveNewDate");
+    document.getElementById("winnerDetailTitlePrefix").textContent = t("winnerDetailTitlePrefix");
+    document.getElementById("winnerDetailHint").textContent = t("winnerDetailHint");
+    document.getElementById("closeWinnerDetailBtn").textContent = t("close");
+    document.getElementById("trashModalTitle").textContent = t("trashModalTitle");
+    document.getElementById("trashModalHint").textContent = t("trashModalHint");
+    document.getElementById("closeTrashBtn").textContent = t("close");
+    document.getElementById("winModalTitle").textContent = t("winModalTitle");
+    document.getElementById("winModalHint").textContent = t("winModalHint");
+    document.getElementById("addWinnerRowLabel").textContent = t("addWinnerRow");
+    document.getElementById("cancelWinBtn").textContent = t("cancel");
+    document.getElementById("confirmCloseBtn").textContent = t("confirmClose");
+    document.querySelectorAll(".lang-row button").forEach(b =>
+      b.classList.toggle("active", b.dataset.lang === code));
+
+    // Re-render everything that was built dynamically in the other language.
+    renderCompetitionList();
+    loadLeaderboard();
+    document.querySelectorAll('.students-panel[style*="block"]').forEach(p => { p.style.display = "none"; });
+  }
 
   // ---------- Admin-only guard ----------
   onAuthStateChanged(auth, async (user) => {
@@ -405,13 +674,13 @@
 
   async function handleInstallClick() {
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
-    if (isStandalone) { alert("التطبيق متثبت بالفعل على جهازك ✅"); return; }
+    if (isStandalone) { alert(t("installAlready")); return; }
     if (deferredInstallPrompt) {
       deferredInstallPrompt.prompt();
       await deferredInstallPrompt.userChoice;
       deferredInstallPrompt = null;
     } else {
-      alert('لو مش شايف خيار التثبيت التلقائي، دوس على زرار المشاركة/القائمة في المتصفح واختار "إضافة إلى الشاشة الرئيسية".');
+      alert(t("installManual"));
     }
   }
 
@@ -446,6 +715,9 @@
   document.getElementById("installAppBtn").addEventListener("click", handleInstallClick);
   document.getElementById("forceUpdateBtn").addEventListener("click", handleForceUpdateClick);
   document.getElementById("sidebarLogoutBtn").addEventListener("click", () => signOut(auth));
+  document.getElementById("btnLangEn").addEventListener("click", () => applyLang("en"));
+  document.getElementById("btnLangAr").addEventListener("click", () => applyLang("ar"));
+  applyLang(currentLang);
 
   async function registerPushToken(uid) {
     try {
@@ -542,14 +814,14 @@
   function formatDeadline(iso) {
     if (!iso) return "—";
     const d = new Date(iso);
-    return d.toLocaleString("ar-EG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleString(t("dateLocale"), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   }
 
   function renderCompetitionList() {
     const container = document.getElementById("compList");
     const activeComps = competitions.filter(c => !c.deleted);
     if (activeComps.length === 0) {
-      container.innerHTML = `<p style="color:var(--ink-soft);font-size:13.5px;">لسه مفيش مسابقات — ابدأ بإضافة أول إعلان.</p>`;
+      container.innerHTML = `<p style="color:var(--ink-soft);font-size:13.5px;">${t("emptyComps")}</p>`;
       return;
     }
 
@@ -560,27 +832,27 @@
         <div class="comp-item" data-id="${c.id}">
           <div class="head">
             <div>
-              <span class="status-pill ${c.status}">${c.status === "open" ? "مفتوحة" : "منتهية"}</span>
+              <span class="status-pill ${c.status}">${c.status === "open" ? t("statusOpen") : t("statusClosed")}</span>
               <h3>${c.title}</h3>
               <div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">
-                آخر موعد للتقديم: <strong style="color:var(--ink);">${formatDeadline(c.applicationDeadline || c.deadline)}</strong>
-                &nbsp;·&nbsp; الموعد النهائي للمسابقة: ${formatDeadline(c.deadline)}
+                ${t("deadlineAppPrefix")} <strong style="color:var(--ink);">${formatDeadline(c.applicationDeadline || c.deadline)}</strong>
+                &nbsp;·&nbsp; ${t("deadlineFinalPrefix")} ${formatDeadline(c.deadline)}
               </div>
             </div>
           </div>
           <div class="funnel">
-            <div class="step"><strong>${stats.viewed}</strong><span>شاهدوا الإعلان</span></div>
-            <div class="step"><strong>${stats.clicked}</strong><span>دخلوا اللينك</span></div>
-            <div class="step"><strong>${stats.submitted}</strong><span>قدّموا الفورم</span></div>
-            <div class="step"><strong>${stats.completed}</strong><span>كملوا للنهاية</span></div>
+            <div class="step"><strong>${stats.viewed}</strong><span>${t("funnelViewed")}</span></div>
+            <div class="step"><strong>${stats.clicked}</strong><span>${t("funnelClicked")}</span></div>
+            <div class="step"><strong>${stats.submitted}</strong><span>${t("funnelSubmitted")}</span></div>
+            <div class="step"><strong>${stats.completed}</strong><span>${t("funnelCompleted")}</span></div>
           </div>
           <div class="comp-actions">
-            <button class="btn small secondary" data-action="toggle-students" data-id="${c.id}">متابعة الطلبة (${stats.submitted})</button>
-            <button class="btn small secondary" data-action="renew" data-id="${c.id}">تجديد ميعاد التقديم</button>
+            <button class="btn small secondary" data-action="toggle-students" data-id="${c.id}">${t("btnFollowUp")} (${stats.submitted})</button>
+            <button class="btn small secondary" data-action="renew" data-id="${c.id}">${t("btnRenew")}</button>
             ${c.status === "open"
-              ? `<button class="btn small danger" data-action="close" data-id="${c.id}">إغلاق المسابقة + نتائج</button>`
-              : `<button class="btn small secondary" data-action="reopen" data-id="${c.id}">إعادة فتح</button>`}
-            <button class="btn small danger" data-action="delete" data-id="${c.id}">🗑️ حذف</button>
+              ? `<button class="btn small danger" data-action="close" data-id="${c.id}">${t("btnClose")}</button>`
+              : `<button class="btn small secondary" data-action="reopen" data-id="${c.id}">${t("btnReopen")}</button>`}
+            <button class="btn small danger" data-action="delete" data-id="${c.id}">${t("btnDelete")}</button>
           </div>
           <div class="students-panel" id="students-${c.id}" style="display:none;"></div>
         </div>`;
@@ -603,7 +875,7 @@
   async function deleteCompetition(competitionId) {
     const c = competitions.find(x => x.id === competitionId);
     if (!c) return;
-    if (!confirm(`متأكد إنك عايز تحذف "${c.title}"؟\nهتقدر تسترجعها في أي وقت من "المسابقات المحذوفة" في القائمة الجانبية.`)) return;
+    if (!confirm(t("deleteConfirm")(c.title))) return;
     await updateDoc(doc(db, "competitions", competitionId), {
       deleted: true,
       deletedAt: serverTimestamp(),
@@ -617,7 +889,7 @@
 
   function formatDeletedAt(ts) {
     if (!ts || !ts.toDate) return "—";
-    return ts.toDate().toLocaleString("ar-EG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    return ts.toDate().toLocaleString(t("dateLocale"), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   }
 
   function renderTrashList() {
@@ -627,7 +899,7 @@
       .sort((a, b) => (b.deletedAt?.toMillis?.() || 0) - (a.deletedAt?.toMillis?.() || 0));
 
     if (deleted.length === 0) {
-      list.innerHTML = `<p style="color:var(--ink-soft);font-size:13px;">سلة المحذوفات فاضية.</p>`;
+      list.innerHTML = `<p style="color:var(--ink-soft);font-size:13px;">${t("trashEmpty")}</p>`;
       return;
     }
 
@@ -635,13 +907,13 @@
       <div class="comp-item">
         <div class="head">
           <div>
-            <span class="status-pill closed">محذوفة</span>
+            <span class="status-pill closed">${t("statusDeleted")}</span>
             <h3>${c.title}</h3>
-            <div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">اتحذفت في: ${formatDeletedAt(c.deletedAt)}</div>
+            <div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">${t("deletedAtPrefix")} ${formatDeletedAt(c.deletedAt)}</div>
           </div>
         </div>
         <div class="comp-actions">
-          <button class="btn small" data-restore="${c.id}">↩️ استرجاع المسابقة</button>
+          <button class="btn small" data-restore="${c.id}">${t("btnRestore")}</button>
         </div>
       </div>`).join("");
 
@@ -665,13 +937,13 @@
     const rows = await getSubmittedStudents(competitionId);
 
     if (rows.length === 0) {
-      panel.innerHTML = `<p style="font-size:12.5px;color:var(--ink-soft);margin-top:10px;">لسه مفيش طلبة قدّموا الفورم.</p>`;
+      panel.innerHTML = `<p style="font-size:12.5px;color:var(--ink-soft);margin-top:10px;">${t("emptyStudents")}</p>`;
       panel.style.display = "block";
       return;
     }
 
     panel.innerHTML = rows.map(r => {
-      const typeLabel = r.participationType === "team" ? "🧑‍🤝‍🧑 فريق" : r.participationType === "individual" ? "🧑 فردي" : "";
+      const typeLabel = r.participationType === "team" ? t("typeTeam") : r.participationType === "individual" ? t("typeIndividual") : "";
       const membersHtml = r.teamMembers && r.teamMembers.length
         ? `<div class="sc-extra">
              ${r.teamMembers.map(m => {
@@ -684,11 +956,11 @@
            </div>`
         : "";
       const supervisorHtml = r.supervisorName
-        ? `<div class="sc-extra">مشرف: ${r.supervisorName}</div>` : "";
+        ? `<div class="sc-extra">${t("supervisorPrefix")} ${r.supervisorName}</div>` : "";
       const notesHtml = r.notes
-        ? `<div class="sc-extra">ملاحظات: ${r.notes}</div>` : "";
+        ? `<div class="sc-extra">${t("notesPrefix")} ${r.notes}</div>` : "";
       const waLink = toWaLink(r.leaderPhone);
-      const dotSpan = `<span class="wa-dot ${r.whatsappJoined ? "joined" : "not-joined"}" title="${r.whatsappJoined ? "منضم لجروب الواتساب" : "لسه مش منضم للجروب"}"></span>`;
+      const dotSpan = `<span class="wa-dot ${r.whatsappJoined ? "joined" : "not-joined"}" title="${r.whatsappJoined ? t("waJoined") : t("waNotJoined")}"></span>`;
       const phoneHtml = r.leaderPhone
         ? (waLink
             ? `<a href="${waLink}" target="_blank" rel="noopener" class="sc-phone">📞 ${r.leaderPhone}${dotSpan}</a>`
@@ -706,10 +978,10 @@
           </div>
           <div class="sc-follow">
             <select data-comp="${competitionId}" data-student="${r.studentId}" class="follow-select">
-              <option value="registered" ${r.followUpStatus === "registered" ? "selected" : ""}>مسجّل</option>
-              <option value="in_progress" ${r.followUpStatus === "in_progress" ? "selected" : ""}>مستمر</option>
-              <option value="completed" ${r.followUpStatus === "completed" ? "selected" : ""}>كمّل للنهاية</option>
-              <option value="dropped" ${r.followUpStatus === "dropped" ? "selected" : ""}>انسحب</option>
+              <option value="registered" ${r.followUpStatus === "registered" ? "selected" : ""}>${t("followRegistered")}</option>
+              <option value="in_progress" ${r.followUpStatus === "in_progress" ? "selected" : ""}>${t("followInProgress")}</option>
+              <option value="completed" ${r.followUpStatus === "completed" ? "selected" : ""}>${t("followCompleted")}</option>
+              <option value="dropped" ${r.followUpStatus === "dropped" ? "selected" : ""}>${t("followDropped")}</option>
             </select>
           </div>
         </div>`;
@@ -784,7 +1056,7 @@
   // ---------- Close competition + winners modal ----------
   async function openWinnerModal(competitionId) {
     closingId = competitionId;
-    document.getElementById("winnerInputs").innerHTML = `<p style="font-size:12.5px;color:var(--ink-soft);">بيتم تحميل الطلبة اللي قدّموا الفورم...</p>`;
+    document.getElementById("winnerInputs").innerHTML = `<p style="font-size:12.5px;color:var(--ink-soft);">${t("loadingStudents")}</p>`;
     document.getElementById("winModalScrim").classList.add("show");
 
     const submitted = await getSubmittedStudents(competitionId);
@@ -792,7 +1064,7 @@
 
     if (submitted.length === 0) {
       document.getElementById("winnerInputs").innerHTML =
-        `<p style="font-size:12.5px;color:var(--coral);">مفيش طلبة قدّموا الفورم لسه — مينفعش تحدد فائزين قبل ما يكون في تسجيلات.</p>`;
+        `<p style="font-size:12.5px;color:var(--coral);">${t("noSubmittedYet")}</p>`;
       return;
     }
     winnerCandidates = submitted; // {studentId, name} — used to populate each row's <select>
@@ -811,7 +1083,7 @@
     row.innerHTML = `
       <input type="number" class="rank" value="${rank}" min="1">
       <select class="winner-select">
-        <option value="" disabled selected>اختر الطالب الفائز</option>
+        <option value="" disabled selected>${t("selectWinnerPlaceholder")}</option>
         ${winnerCandidates.map(s => `<option value="${s.studentId}">${s.name}</option>`).join("")}
       </select>`;
     wrap.appendChild(row);
@@ -840,7 +1112,7 @@
     }).filter(Boolean);
 
     if (winners.length === 0) {
-      alert("اختر على الأقل طالب فائز واحد قبل التأكيد.");
+      alert(t("alertPickWinner"));
       return;
     }
 
@@ -913,9 +1185,9 @@
     document.getElementById("lbParticipation").innerHTML = top.map((e, i) => `
       <div class="lb-row lb-row-clickable" data-uid="${e.uid}" data-name="${e.name.replace(/"/g, "&quot;")}" data-mode="all">
         <span class="lb-rank ${i === 0 ? "gold" : ""}">${i + 1}</span>
-        <div class="info"><strong>${e.name}</strong><span>مشاركات مسجّلة — دوس لعرض التفاصيل</span></div>
-        <div class="count"><strong>${e.submissions}</strong><span>مسابقة</span></div>
-      </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px;">لا توجد بيانات كافية بعد.</p>`;
+        <div class="info"><strong>${e.name}</strong><span>${t("lbParticipationSub")}</span></div>
+        <div class="count"><strong>${e.submissions}</strong><span>${t("unitCompetition")}</span></div>
+      </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px;">${t("noDataYet")}</p>`;
 
     // Winners leaderboard: tally rank appearances across closed competitions,
     // grouped by studentId (not name) — safe against duplicate/similar names.
@@ -932,9 +1204,9 @@
     document.getElementById("lbWinners").innerHTML = winEntries.map(({ studentId, name, count }, i) => `
       <div class="lb-row lb-row-clickable" data-uid="${studentId}" data-name="${name.replace(/"/g, "&quot;")}" data-mode="winners">
         <span class="lb-rank ${i === 0 ? "gold" : ""}">${i + 1}</span>
-        <div class="info"><strong>${name}</strong><span>حصل على مراكز — دوس لعرض التفاصيل</span></div>
-        <div class="count"><strong>${count}</strong><span>مركز</span></div>
-      </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px;">لسه مفيش نتائج معلنة.</p>`;
+        <div class="info"><strong>${name}</strong><span>${t("lbWinnersSub")}</span></div>
+        <div class="count"><strong>${count}</strong><span>${t("unitRank")}</span></div>
+      </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px;">${t("noResultsYet")}</p>`;
 
     document.querySelectorAll(".lb-row-clickable").forEach(row =>
     row.addEventListener("click", () => openStudentDetailModal(row.dataset.uid, row.dataset.name, row.dataset.mode)));
@@ -946,9 +1218,9 @@
     const details = mode === "winners" ? all.filter(d => d.rank) : all;
     document.getElementById("winnerDetailName").textContent = name;
     document.getElementById("winnerDetailList").innerHTML = details.map(d => {
-      const rankLabel = d.rank ? `حصل على المركز ${d.rank}` : "شارك من غير ما ياخد مركز";
-      const typeLabel = d.participationType === "team" ? "🧑‍🤝‍🧑 جماعي" : d.participationType === "individual" ? "🧑 فردي" : "غير معروف";
-      const supervisorLabel = d.supervisorName ? `مشرف: ${d.supervisorName}` : "من غير مشرف";
+      const rankLabel = d.rank ? t("rankLabel")(d.rank) : t("noRankLabel");
+      const typeLabel = d.participationType === "team" ? t("typeTeam") : d.participationType === "individual" ? t("typeIndividual") : t("typeUnknown");
+      const supervisorLabel = d.supervisorName ? t("supervisorWith")(d.supervisorName) : t("supervisorWithout");
       return `
         <div class="winner-detail-row">
           <div class="winner-detail-rank ${d.rank ? "" : "no-rank"}">${d.rank || "—"}</div>
@@ -957,7 +1229,7 @@
             <span>${rankLabel} · ${typeLabel} · ${supervisorLabel}</span>
           </div>
         </div>`;
-    }).join("") || `<p style="color:var(--ink-soft);font-size:13px;">مفيش تفاصيل متاحة.</p>`;
+    }).join("") || `<p style="color:var(--ink-soft);font-size:13px;">${t("noDetails")}</p>`;
     document.getElementById("winnerDetailModalScrim").classList.add("show");
   }
   document.getElementById("closeWinnerDetailBtn").addEventListener("click", () =>
