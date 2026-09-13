@@ -216,6 +216,11 @@
     </a>
 
     <div class="side-section">
+      <p class="side-label">المسابقات</p>
+      <button class="save-btn outline" id="trashBtn">🗑️ المسابقات المحذوفة (<span id="trashCount">0</span>)</button>
+    </div>
+
+    <div class="side-section">
       <p class="side-label">التطبيق</p>
       <button class="save-btn" id="installAppBtn" style="margin-bottom:8px;">📲 تثبيت التطبيق</button>
       <button class="save-btn outline" id="forceUpdateBtn">🔄 تحديث فوري (مسح الكاش)</button>
@@ -304,6 +309,18 @@
     </div>
   </div>
 
+  <!-- ---------- Deleted competitions (trash) modal ---------- -->
+  <div class="modal-scrim" id="trashModalScrim">
+    <div class="modal">
+      <h2>المسابقات المحذوفة</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;">اتحذفت من القائمة الرئيسية بس بياناتها محفوظة بالكامل — تقدر تسترجع أي مسابقة في أي وقت.</p>
+      <div id="trashList"></div>
+      <div class="row-between" style="margin-top:18px;justify-content:flex-end;">
+        <button type="button" class="btn secondary" id="closeTrashBtn">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ---------- Close competition / winners modal ---------- -->
   <div class="modal-scrim" id="winModalScrim">
     <div class="modal">
@@ -342,6 +359,7 @@
   const db = getFirestore(app);
 
   let competitions = [];
+  let allInteractions = [];
   let editingId = null;
   let closingId = null;
 
@@ -363,9 +381,20 @@
     }
 
     listenToCompetitions();
-    loadLeaderboard();
+    listenToInteractions();
     registerPushToken(user.uid);
   });
+
+  // Single realtime listener for ALL interaction docs, reused by the
+  // per-competition funnel stats, the students panel, and the leaderboard —
+  // replaces what used to be a separate Firestore query per competition.
+  function listenToInteractions() {
+    onSnapshot(collection(db, "competition_interactions"), (snap) => {
+      allInteractions = snap.docs.map(d => d.data());
+      renderCompetitionList();
+      loadLeaderboard();
+    });
+  }
 
   // ---------- Install app / force update (PWA) ----------
   let deferredInstallPrompt = null;
@@ -448,21 +477,20 @@
   // ---------- Listen to competitions + compute funnel stats ----------
   function listenToCompetitions() {
     const q = query(collection(db, "competitions"), orderBy("createdAt", "desc"));
-    onSnapshot(q, async (snap) => {
+    onSnapshot(q, (snap) => {
       competitions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      document.getElementById("totalCount").textContent = competitions.length;
-      await renderCompetitionList();
+      document.getElementById("totalCount").textContent = competitions.filter(c => !c.deleted).length;
+      const trashCountEl = document.getElementById("trashCount");
+      if (trashCountEl) trashCountEl.textContent = competitions.filter(c => c.deleted).length;
+      renderCompetitionList();
     });
   }
 
-  // NOTE: for a small/medium number of students this client-side aggregation
-  // (reading all interaction docs per competition) is fine. If the school
-  // grows past a few thousand submissions, move this counting into a
-  // Cloud Function that maintains counters on the competition doc instead.
-  async function getInteractionStats(competitionId) {
-    const q = query(collection(db, "competition_interactions"), where("competitionId", "==", competitionId));
-    const snap = await getDocs(q);
-    const docs = snap.docs.map(d => d.data());
+  // Now a pure, synchronous read from the single cached `allInteractions`
+  // array (populated once by listenToInteractions) — no per-competition
+  // Firestore round-trip anymore.
+  function getInteractionStats(competitionId) {
+    const docs = allInteractions.filter(d => d.competitionId === competitionId);
     return {
       viewed: docs.filter(d => d.viewedAt).length,
       clicked: docs.filter(d => d.clickedLinkAt).length,
@@ -476,7 +504,7 @@
   // Shared lookup: students who actually submitted the form for a competition,
   // with their real names — used by both the follow-up table and the winners picker.
   async function getSubmittedStudents(competitionId) {
-    const stats = await getInteractionStats(competitionId);
+    const stats = getInteractionStats(competitionId);
     const submitted = stats.raw.filter(d => d.formSubmittedAt);
     return Promise.all(submitted.map(async (d) => {
       const uSnap = await getDoc(doc(db, "users", d.studentId));
@@ -517,16 +545,17 @@
     return d.toLocaleString("ar-EG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   }
 
-  async function renderCompetitionList() {
+  function renderCompetitionList() {
     const container = document.getElementById("compList");
-    if (competitions.length === 0) {
+    const activeComps = competitions.filter(c => !c.deleted);
+    if (activeComps.length === 0) {
       container.innerHTML = `<p style="color:var(--ink-soft);font-size:13.5px;">لسه مفيش مسابقات — ابدأ بإضافة أول إعلان.</p>`;
       return;
     }
 
     let html = "";
-    for (const c of competitions) {
-      const stats = await getInteractionStats(c.id);
+    for (const c of activeComps) {
+      const stats = getInteractionStats(c.id);
       html += `
         <div class="comp-item" data-id="${c.id}">
           <div class="head">
@@ -551,6 +580,7 @@
             ${c.status === "open"
               ? `<button class="btn small danger" data-action="close" data-id="${c.id}">إغلاق المسابقة + نتائج</button>`
               : `<button class="btn small secondary" data-action="reopen" data-id="${c.id}">إعادة فتح</button>`}
+            <button class="btn small danger" data-action="delete" data-id="${c.id}">🗑️ حذف</button>
           </div>
           <div class="students-panel" id="students-${c.id}" style="display:none;"></div>
         </div>`;
@@ -565,7 +595,67 @@
       btn.addEventListener("click", () => openWinnerModal(btn.dataset.id)));
     container.querySelectorAll('[data-action="reopen"]').forEach(btn =>
       btn.addEventListener("click", () => updateDoc(doc(db, "competitions", btn.dataset.id), { status: "open" })));
+    container.querySelectorAll('[data-action="delete"]').forEach(btn =>
+      btn.addEventListener("click", () => deleteCompetition(btn.dataset.id)));
   }
+
+  // ---------- Soft delete / trash ----------
+  async function deleteCompetition(competitionId) {
+    const c = competitions.find(x => x.id === competitionId);
+    if (!c) return;
+    if (!confirm(`متأكد إنك عايز تحذف "${c.title}"؟\nهتقدر تسترجعها في أي وقت من "المسابقات المحذوفة" في القائمة الجانبية.`)) return;
+    await updateDoc(doc(db, "competitions", competitionId), {
+      deleted: true,
+      deletedAt: serverTimestamp(),
+    });
+  }
+
+  async function restoreCompetition(competitionId) {
+    await updateDoc(doc(db, "competitions", competitionId), { deleted: false });
+    renderTrashList();
+  }
+
+  function formatDeletedAt(ts) {
+    if (!ts || !ts.toDate) return "—";
+    return ts.toDate().toLocaleString("ar-EG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function renderTrashList() {
+    const list = document.getElementById("trashList");
+    const deleted = competitions
+      .filter(c => c.deleted)
+      .sort((a, b) => (b.deletedAt?.toMillis?.() || 0) - (a.deletedAt?.toMillis?.() || 0));
+
+    if (deleted.length === 0) {
+      list.innerHTML = `<p style="color:var(--ink-soft);font-size:13px;">سلة المحذوفات فاضية.</p>`;
+      return;
+    }
+
+    list.innerHTML = deleted.map(c => `
+      <div class="comp-item">
+        <div class="head">
+          <div>
+            <span class="status-pill closed">محذوفة</span>
+            <h3>${c.title}</h3>
+            <div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">اتحذفت في: ${formatDeletedAt(c.deletedAt)}</div>
+          </div>
+        </div>
+        <div class="comp-actions">
+          <button class="btn small" data-restore="${c.id}">↩️ استرجاع المسابقة</button>
+        </div>
+      </div>`).join("");
+
+    list.querySelectorAll("[data-restore]").forEach(btn =>
+      btn.addEventListener("click", () => restoreCompetition(btn.dataset.restore)));
+  }
+
+  function openTrashModal() {
+    renderTrashList();
+    document.getElementById("trashModalScrim").classList.add("show");
+  }
+  document.getElementById("trashBtn").addEventListener("click", openTrashModal);
+  document.getElementById("closeTrashBtn").addEventListener("click", () =>
+    document.getElementById("trashModalScrim").classList.remove("show"));
 
   // ---------- Per-student follow-up table ----------
   async function toggleStudentsPanel(competitionId) {
@@ -770,16 +860,8 @@
   let studentDetailsMap = {};
 
   async function loadLeaderboard() {
-    // Freeze ONE consistent view of "competitions" for this whole run. It's
-    // fed by a realtime listener that can otherwise replace the array
-    // mid-function (we do several `await`s below) — if that happens between
-    // building the rank map and tallying win counts, the two end up computed
-    // from different snapshots and disagree (e.g. count says 2 wins but the
-    // breakdown only finds a rank for 1). Deriving winCounts from the exact
-    // same rankByCompStudent map removes that possibility entirely.
-    const comps = competitions;
-
-    const snap = await getDocs(collection(db, "competition_interactions"));
+    // Freeze ONE consistent view of "competitions" for this whole run.
+    const comps = competitions.filter(c => !c.deleted);
 
     // competitionId -> title, `${competitionId}_${studentId}` -> rank, and
     // win tallies — all built from the single frozen snapshot above.
@@ -799,8 +881,7 @@
 
     const byStudent = {};
     studentDetailsMap = {};
-    snap.docs.forEach(d => {
-      const data = d.data();
+    allInteractions.forEach((data) => {
       if (!data.formSubmittedAt) return; // only count/list completed registrations
       if (!byStudent[data.studentId]) byStudent[data.studentId] = { submissions: 0 };
       byStudent[data.studentId].submissions++;
