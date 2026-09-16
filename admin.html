@@ -203,8 +203,14 @@
   .lang-row button.active{ background:rgba(255,255,255,0.14); color:#fff; border-color:rgba(255,255,255,0.3); }
 
   /* ---------- Disable browser pull-to-refresh in the installed PWA only ---------- */
-  @media (display-mode: standalone){
-    html, body{ overscroll-behavior-y: contain; }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:0.01ms !important; transition-duration:0.01ms !important; }
+  }
+
+  .icon-btn:focus-visible, .tab:focus-visible, .btn:focus-visible, a:focus-visible,
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{
+    outline:2px solid var(--gold);
+    outline-offset:2px;
   }
 
   /* ---------- Prevent accidental long-press text selection ----------
@@ -392,9 +398,6 @@
     getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addDoc,
     updateDoc, deleteDoc, where, getDocs, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  import {
-    getStorage, ref, uploadBytes, getDownloadURL, deleteObject
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
   // TODO: same Firebase config as index.html / home.html
   const firebaseConfig = {
@@ -409,7 +412,8 @@
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
-  const storage = getStorage(app);
+  const CLOUDINARY_CLOUD_NAME = "YOUR_CLOUD_NAME"; // من Cloudinary Dashboard
+  const CLOUDINARY_UPLOAD_PRESET = "competition_media_unsigned"; // الـ preset اللي عملته فوق
 
   let competitions = [];
   let allInteractions = [];
@@ -1131,11 +1135,22 @@
 
     try {
       const blob = await compressImage(file);
-      const mediaId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const storagePath = `competition-media/${mediaCompId}/${mediaId}.jpg`;
-      const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, blob, { contentType: "image/jpeg" });
-      const url = await getDownloadURL(storageRef);
+
+      const formData = new FormData();
+      formData.append("file", blob);
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      formData.append("folder", `competition-media/${mediaCompId}`);
+
+      const uploadRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: "POST", body: formData }
+      );
+      if (!uploadRes.ok) throw new Error("cloudinary upload failed");
+      const uploadData = await uploadRes.json();
+      // storagePath repurposed to hold the Cloudinary public_id — needed
+      // server-side later to delete the asset (deletion requires the API secret).
+      const url = uploadData.secure_url;
+      const storagePath = uploadData.public_id;
 
       const order = mediaItems.filter(m => !m._pending).length;
       await addDoc(collection(db, "competitions", mediaCompId, "media"), {
@@ -1156,14 +1171,19 @@
     if (!item) return;
     if (!confirm(currentLang === "ar" ? "تحذف الصورة دي؟" : "Delete this photo?")) return;
     try {
-      // Delete Firestore metadata first — if Storage deletion then fails
-      // (e.g. offline), the image is already gone from every UI and just
-      // becomes an orphaned Storage object, which is harmless and can be
-      // cleaned up later; the reverse order could leave a broken image
-      // reference visible to students, which is worse.
+      // Delete Firestore metadata first — same reasoning as before: if the
+      // Cloudinary delete call then fails (e.g. offline), the image is
+      // already gone from every UI and just becomes an orphaned Cloudinary
+      // asset, harmless and cleanable later. The reverse order could leave
+      // a broken image reference visible to students, which is worse.
       await deleteDoc(doc(db, "competitions", mediaCompId, "media", mediaId));
       if (item.storagePath) {
-        await deleteObject(ref(storage, item.storagePath)).catch(() => {});
+        const token = await auth.currentUser.getIdToken();
+        await fetch(`${API_BASE}/api/media/delete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({ publicId: item.storagePath })
+        }).catch(() => {});
       }
       await loadMediaFor(mediaCompId);
     } catch (err) {

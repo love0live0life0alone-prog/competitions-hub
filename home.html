@@ -78,8 +78,13 @@
     padding:16px; cursor:pointer; position:relative; overflow:hidden;
     transition:box-shadow .18s ease, transform .12s ease;
   }
-  .card:hover{ box-shadow:0 14px 30px -20px rgba(13,23,39,0.35); }
-  .card:active{ transform:scale(0.99); }
+  .card{ animation: cardFloat 6s ease-in-out infinite; }
+  .card:nth-child(2n){ animation-delay: -1.4s; }
+  .card:nth-child(3n){ animation-delay: -3.1s; }
+  @keyframes cardFloat{
+    0%,100%{ transform:translateY(0); }
+    50%{ transform:translateY(-2.5px); }
+  }
   .card::before{
     content:""; position:absolute; inset-inline-start:0; top:0; bottom:0; width:4px;
   }
@@ -269,6 +274,15 @@
 
 @media (prefers-reduced-motion: reduce){
   .gallery-track{ scroll-behavior:auto; }
+  .card{ animation:none !important; }
+  .detail-overlay, .modal-scrim .reg-modal, .lightbox img{ transition-duration:0.01ms !important; }
+}
+
+.icon-btn:focus-visible, .filter-chip:focus-visible, .cta-link:focus-visible,
+.cta-whatsapp:focus-visible, button:focus-visible, a:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible{
+  outline:2px solid var(--gold);
+  outline-offset:2px;
 }
 
   @media (min-width:760px){
@@ -754,7 +768,12 @@
       card.addEventListener("click", () => openDetail(card.dataset.id));
     });
 
-    gsap.fromTo(".card", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .4, stagger: .05, ease: "power2.out" });
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      gsap.set(".card", { opacity: 1, y: 0 });
+    } else {
+      gsap.fromTo(".card", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .4, stagger: .05, ease: "power2.out" });
+    }
   }
 
   function formatDate(iso) {

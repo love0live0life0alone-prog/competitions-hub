@@ -22,7 +22,7 @@ service cloud.firestore {
       allow read: if isUniversityAccount() && request.auth.uid == userId;
       allow create: if isUniversityAccount()
                     && request.auth.uid == userId
-                    && request.resource.data.universityEmail == request.auth.token.email
+                    && request.resource.data.universityEmail == request.auth.token.email.lower()
                     && request.resource.data.role == "student";
       allow update: if isUniversityAccount()
                     && request.auth.uid == userId

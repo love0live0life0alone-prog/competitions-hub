@@ -23,6 +23,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, auth, firestore, messaging
+import cloudinary
+import cloudinary.uploader
 
 app = Flask(__name__)
 CORS(app)
@@ -34,6 +36,13 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 ALLOWED_DOMAIN = os.environ.get("ALLOWED_EMAIL_DOMAIN", "feng.bu.edu.eg")
+
+cloudinary.config(
+    cloud_name=os.environ["CLOUDINARY_CLOUD_NAME"],
+    api_key=os.environ["CLOUDINARY_API_KEY"],
+    api_secret=os.environ["CLOUDINARY_API_SECRET"],
+    secure=True,
+)
 
 
 def verify_request_user():
@@ -282,6 +291,29 @@ def close_competition(competition_id):
         tokens=get_all_recipient_tokens(),
         competition_id=competition_id,
     )
+    return jsonify({"ok": True})
+
+
+# ---------- Delete a competition media asset from Cloudinary (admin only) ----------
+@app.route("/api/media/delete", methods=["POST"])
+def delete_media():
+    decoded = verify_request_user()
+    if not decoded:
+        return jsonify({"error": "unauthorized"}), 401
+    if not require_admin(decoded):
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json() or {}
+    public_id = data.get("publicId")
+    if not public_id:
+        return jsonify({"error": "publicId required"}), 400
+
+    try:
+        cloudinary.uploader.destroy(public_id)
+    except Exception as e:
+        print(f"cloudinary delete error: {e}")
+        return jsonify({"error": "delete failed"}), 500
+
     return jsonify({"ok": True})
 
 
