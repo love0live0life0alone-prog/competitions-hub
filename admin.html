@@ -304,6 +304,7 @@
     <div class="modal">
       <h2 id="compModalTitle">New Competition</h2>
       <form id="compForm">
+        <div id="compFieldsWrap">
         <div class="field"><label id="lblFTitle">Competition title</label><input type="text" id="fTitle" required></div>
         <div class="field"><label id="lblFDesc">Full description (details, application conditions...)</label><textarea id="fDesc" required></textarea></div>
         <div class="field"><label id="lblFLink">Competition link</label><input type="url" id="fLink" required></div>
@@ -324,6 +325,7 @@
         <p style="font-size:12px;color:var(--ink-soft);margin:-10px 0 14px;line-height:1.6;" id="hintWhatsapp">
           Shown to the student as a "Join group" button right after they register — if the competition needs an external form, send it in the group after members join.
         </p>
+        </div>
         <div class="field">
           <label id="lblMediaSection">Competition Media</label>
           <input type="file" id="fMediaInput" accept="image/*" multiple style="display:none;">
@@ -419,6 +421,7 @@
   let allInteractions = [];
   let editingId = null;
   let closingId = null;
+  let studentDetailsMap = {}; // studentId -> [{ title, rank, participationType, supervisorName }]
 
   // ---------- i18n ----------
   const STR = {
@@ -455,6 +458,8 @@
       btnReopen: "Reopen",
       btnDelete: "🗑️ Delete",
       btnRestore: "↩️ Restore competition",
+      btnManagePhotos: "📷 Manage Photos",
+      managePhotosModalTitle: "Manage Photos",
       emptyStudents: "No students have submitted the form yet.",
       typeTeam: "🧑‍🤝‍🧑 Team",
       typeIndividual: "🧑 Individual",
@@ -549,6 +554,8 @@
       btnReopen: "إعادة فتح",
       btnDelete: "🗑️ حذف",
       btnRestore: "↩️ استرجاع المسابقة",
+      btnManagePhotos: "📷 إدارة الصور",
+      managePhotosModalTitle: "إدارة صور المسابقة",
       emptyStudents: "لسه مفيش طلبة قدّموا الفورم.",
       typeTeam: "🧑‍🤝‍🧑 فريق",
       typeIndividual: "🧑 فردي",
@@ -891,6 +898,7 @@
           </div>
           <div class="comp-actions">
             <button class="btn small secondary" data-action="toggle-students" data-id="${c.id}">${t("btnFollowUp")} (${stats.submitted})</button>
+            <button class="btn small secondary" data-action="photos" data-id="${c.id}">${t("btnManagePhotos")}</button>
             <button class="btn small secondary" data-action="renew" data-id="${c.id}">${t("btnRenew")}</button>
             ${c.status === "open"
               ? `<button class="btn small danger" data-action="close" data-id="${c.id}">${t("btnClose")}</button>`
@@ -904,6 +912,8 @@
 
     container.querySelectorAll('[data-action="toggle-students"]').forEach(btn =>
       btn.addEventListener("click", () => toggleStudentsPanel(btn.dataset.id)));
+    container.querySelectorAll('[data-action="photos"]').forEach(btn =>
+      btn.addEventListener("click", () => openPhotosOnlyModal(btn.dataset.id)));
     container.querySelectorAll('[data-action="renew"]').forEach(btn =>
       btn.addEventListener("click", () => openRenewModal(btn.dataset.id)));
     container.querySelectorAll('[data-action="close"]').forEach(btn =>
@@ -1207,6 +1217,10 @@
   document.getElementById("newCompBtn").addEventListener("click", () => {
     editingId = null;
     document.getElementById("compForm").reset();
+    document.getElementById("compFieldsWrap").style.display = "block";
+    document.getElementById("submitCompBtn").style.display = "inline-block";
+    document.getElementById("cancelCompBtn").textContent = t("cancel");
+    document.getElementById("compModalTitle").textContent = t("compModalTitle");
     loadMediaFor(null);
     document.getElementById("compModalScrim").classList.add("show");
   });
@@ -1215,6 +1229,11 @@
 
   document.getElementById("compForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (editingId) {
+      // Already published — this modal instance only manages photos now.
+      document.getElementById("compModalScrim").classList.remove("show");
+      return;
+    }
     const payload = {
       title: document.getElementById("fTitle").value.trim(),
       description: document.getElementById("fDesc").value.trim(),
@@ -1236,15 +1255,17 @@
     });
     const result = await res.json();
 
-    // Now that the competition has an id, photos can be attached — the
-    // admin can keep the modal open and start adding photos immediately
-    // instead of having to reopen an "edit" flow that doesn't exist yet.
+    // Now that the competition has an id, photos can be attached — keep
+    // the modal open in "manage photos" mode instead of closing it.
     if (result.id) {
       mediaCompId = result.id;
-      document.getElementById("addPhotosBtn").disabled = false;
+      editingId = result.id;
+      document.getElementById("compFieldsWrap").style.display = "none";
+      document.getElementById("submitCompBtn").style.display = "none";
+      document.getElementById("cancelCompBtn").textContent = t("close");
+      document.getElementById("compModalTitle").textContent = t("managePhotosModalTitle");
+      await loadMediaFor(result.id);
     }
-
-    document.getElementById("compModalScrim").classList.remove("show");
   });
 
   // ---------- Renew application deadline ----------
@@ -1252,6 +1273,17 @@
   // admin can push this back as many times as needed without touching the
   // competition's final deadline. Written directly to Firestore (same
   // pattern as reopen/follow-up status) since it needs no push notification.
+  function openPhotosOnlyModal(competitionId) {
+    editingId = competitionId;
+    mediaCompId = competitionId;
+    document.getElementById("compFieldsWrap").style.display = "none";
+    document.getElementById("submitCompBtn").style.display = "none";
+    document.getElementById("cancelCompBtn").textContent = t("close");
+    document.getElementById("compModalTitle").textContent = t("managePhotosModalTitle");
+    loadMediaFor(competitionId);
+    document.getElementById("compModalScrim").classList.add("show");
+  }
+
   let renewingId = null;
   function openRenewModal(competitionId) {
     renewingId = competitionId;
@@ -1344,10 +1376,7 @@
   });
 
   // ---------- Leaderboard ----------
-  // studentId -> [{ title, rank (null if no rank), participationType, supervisorName }]
   // Built once per load and reused by BOTH leaderboards' click-through modal.
-  let studentDetailsMap = {};
-
   async function loadLeaderboard() {
     // Freeze ONE consistent view of "competitions" for this whole run.
     const comps = competitions.filter(c => !c.deleted);
