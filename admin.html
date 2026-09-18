@@ -451,10 +451,30 @@
   const CLOUDINARY_UPLOAD_PRESET = "competition_media_unsigned"; // الـ preset اللي عملته فوق
 
   let competitions = [];
-  let allInteractions = [];
   let editingId = null;
   let closingId = null;
   let studentDetailsMap = {}; // studentId -> [{ title, rank, participationType, supervisorName }]
+
+  // ---------- Leaderboard data (loaded on demand — NOT a realtime listener) ----------
+  let leaderboardInteractions = null;  // submitted interaction docs (data only); null = never loaded
+  let leaderboardFetchedAt = 0;        // Date.now() of the last successful fetch
+  let leaderboardFetchPromise = null;  // in-flight guard: concurrent callers share one fetch
+  let leaderboardRenderToken = 0;      // lets a newer render supersede an older async one
+  const LEADERBOARD_TTL_MS = 2 * 60 * 1000;
+  const userNameCache = new Map();     // uid -> Promise<fullName | null> (null = account no longer exists)
+
+  // ---------- Live "Track Students" panel state ----------
+  // Funnel counters (viewed/clicked/submitted/whatsappJoined) live on
+  // competitions/{id}.stats and arrive via the existing competitions
+  // listener — no global interactions listener needed for those anymore.
+  // "completed" (from admin-set followUpStatus) is NOT a server counter yet
+  // (deliberately deferred) — it displays as 0 until a panel has been
+  // opened at least once this session, after which it's the real live
+  // count and stays at its last known value for the rest of the session.
+  let activePanelListeners = {};   // competitionId -> unsubscribe function
+  let openPanelIds = new Set();    // competitionId currently expanded
+  let panelCompletedCache = {};    // competitionId -> last known "completed" count (undefined = not loaded yet this session)
+  let panelRowsCache = {};         // competitionId -> last computed rows (instant, correctly-wired redisplay)
 
   // ---------- i18n ----------
   const STR = {
@@ -667,6 +687,23 @@
   let currentLang = localStorage.getItem("uch_admin_lang") === "ar" ? "ar" : "en";
   const t = (key) => STR[currentLang][key];
 
+  // ---------- XSS protection ----------
+  // Escapes untrusted text — anything that ultimately came from a student
+  // (registration form fields, team member names/phones, their profile
+  // fullName used as a fallback leader name, notes, etc.) — before it is
+  // interpolated into an innerHTML template string anywhere in this file.
+  // Admin-authored fields (competition titles, translated UI labels from
+  // t()) are not run through this; they are not attacker-controlled here.
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   function applyLang(code) {
     currentLang = code;
     localStorage.setItem("uch_admin_lang", code);
@@ -726,10 +763,16 @@
     document.querySelectorAll(".lang-row button").forEach(b =>
       b.classList.toggle("active", b.dataset.lang === code));
 
+    // Close any open "Track Students" panels and tear down their listeners
+    // before switching language — renderCompetitionList() below rebuilds the
+    // whole list in the new language, so a listener left running would just
+    // be writing into DOM nodes about to be discarded.
+    closeAllStudentPanels();
     // Re-render everything that was built dynamically in the other language.
     renderCompetitionList();
-    loadLeaderboard();
-    document.querySelectorAll('.students-panel[style*="block"]').forEach(p => { p.style.display = "none"; });
+    // Leaderboard: re-render from cache only (no Firestore reads, and nothing
+    // runs before sign-in). It is fetched lazily when its tab is opened.
+    if (leaderboardInteractions) renderLeaderboard();
   }
 
   // ---------- Admin-only guard ----------
@@ -750,19 +793,19 @@
     }
 
     listenToCompetitions();
-    listenToInteractions();
     registerPushToken(user.uid);
   });
 
-  // Single realtime listener for ALL interaction docs, reused by the
-  // per-competition funnel stats, the students panel, and the leaderboard —
-  // replaces what used to be a separate Firestore query per competition.
-  function listenToInteractions() {
-    onSnapshot(collection(db, "competition_interactions"), (snap) => {
-      allInteractions = snap.docs.map(d => d.data());
-      renderCompetitionList();
-      loadLeaderboard();
+  // Tears down every open "Track Students" panel's realtime listener and
+  // clears its open/visible state — used before a rebuild we know will
+  // discard the panel DOM (language switch), so nothing keeps writing into
+  // detached nodes.
+  function closeAllStudentPanels() {
+    Object.keys(activePanelListeners).forEach(id => {
+      activePanelListeners[id]();
+      delete activePanelListeners[id];
     });
+    openPanelIds.clear();
   }
 
   // ---------- Install app / force update (PWA) ----------
@@ -846,56 +889,72 @@
     });
   });
 
-  // ---------- Listen to competitions + compute funnel stats ----------
+  // ---------- Listen to competitions + live funnel stats ----------
+  // Most snapshots here are pure stats increments (a student viewed/clicked/
+  // submitted somewhere) and must NOT rebuild the whole list — that's what
+  // used to close open "Track Students" panels. Only a genuine structural
+  // change (competition added/removed, or any non-stats field changed —
+  // status, deadline, winners, deleted, etc.) triggers a full
+  // renderCompetitionList(); everything else just patches the numbers.
   function listenToCompetitions() {
     const q = query(collection(db, "competitions"), orderBy("createdAt", "desc"));
     onSnapshot(q, (snap) => {
-      competitions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const next = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const structural = didStructureChange(competitions, next);
+      competitions = next;
       document.getElementById("totalCount").textContent = competitions.filter(c => !c.deleted).length;
       const trashCountEl = document.getElementById("trashCount");
       if (trashCountEl) trashCountEl.textContent = competitions.filter(c => c.deleted).length;
-      renderCompetitionList();
+
+      if (structural) {
+        renderCompetitionList();
+        // Titles/winners/deleted flags may have changed — refresh the
+        // leaderboard from its cache (no interaction reads).
+        if (leaderboardInteractions) renderLeaderboard();
+      } else {
+        patchFunnelNumbers(competitions);
+      }
     });
   }
 
-  // Now a pure, synchronous read from the single cached `allInteractions`
-  // array (populated once by listenToInteractions) — no per-competition
-  // Firestore round-trip anymore.
-  function getInteractionStats(competitionId) {
-    const docs = allInteractions.filter(d => d.competitionId === competitionId);
-    return {
-      viewed: docs.filter(d => d.viewedAt).length,
-      clicked: docs.filter(d => d.clickedLinkAt).length,
-      submitted: docs.filter(d => d.formSubmittedAt).length,
-      completed: docs.filter(d => d.followUpStatus === "completed").length,
-      dropped: docs.filter(d => d.followUpStatus === "dropped").length,
-      raw: docs
-    };
+  function withoutStats(c) {
+    const { stats, ...rest } = c;
+    return rest;
   }
 
-  // Shared lookup: students who actually submitted the form for a competition,
-  // with their real names — used by both the follow-up table and the winners picker.
-  async function getSubmittedStudents(competitionId) {
-    const stats = getInteractionStats(competitionId);
-    const submitted = stats.raw.filter(d => d.formSubmittedAt);
-    return Promise.all(submitted.map(async (d) => {
-      const uSnap = await getDoc(doc(db, "users", d.studentId));
-      // Fall back to the account holder's own name only for very old records
-      // saved before the in-app registration form existed.
-      const accountName = uSnap.exists() ? uSnap.data().fullName : d.studentId;
-      return {
-        studentId: d.studentId,
-        name: d.leaderName || accountName,
-        followUpStatus: d.followUpStatus || "registered",
-        participationType: d.participationType || null,
-        leaderPhone: d.leaderPhone || null,
-        leaderEmail: d.leaderEmail || null,
-        supervisorName: d.supervisorName || null,
-        teamMembers: d.teamMembers || [],
-        notes: d.notes || null,
-        whatsappJoined: !!d.whatsappJoinedAt,
-      };
-    }));
+  // True only when something OTHER than stats differs — competitions
+  // added/removed, or any non-stats field changed on an existing one.
+  function didStructureChange(prev, next) {
+    if (prev.length !== next.length) return true;
+    const prevById = {};
+    prev.forEach(c => { prevById[c.id] = c; });
+    for (const c of next) {
+      const old = prevById[c.id];
+      if (!old) return true;
+      if (JSON.stringify(withoutStats(old)) !== JSON.stringify(withoutStats(c))) return true;
+    }
+    return false;
+  }
+
+  // Cheap path for a pure stats change: patch just the numbers already on
+  // screen — no innerHTML rebuild, so open panels and scroll position are
+  // completely undisturbed.
+  function patchFunnelNumbers(list) {
+    list.forEach(c => {
+      const card = document.querySelector(`.comp-item[data-id="${c.id}"]`);
+      if (!card) return;
+      const viewed = (c.stats && c.stats.viewed) || 0;
+      const clicked = (c.stats && c.stats.clicked) || 0;
+      const submitted = (c.stats && c.stats.submitted) || 0;
+      const vEl = card.querySelector('[data-stat="viewed"]');
+      const cEl = card.querySelector('[data-stat="clicked"]');
+      const sEl = card.querySelector('[data-stat="submitted"]');
+      const sBtnEl = card.querySelector('[data-stat="submitted-btn"]');
+      if (vEl) vEl.textContent = viewed;
+      if (cEl) cEl.textContent = clicked;
+      if (sEl) sEl.textContent = submitted;
+      if (sBtnEl) sBtnEl.textContent = submitted;
+    });
   }
 
   // Builds a wa.me link from a phone number entered in the registration
@@ -920,6 +979,16 @@
   function renderCompetitionList() {
     const container = document.getElementById("compList");
     const activeComps = competitions.filter(c => !c.deleted);
+
+    // A panel whose competition left the visible list (soft-deleted) has no
+    // DOM anymore — drop its listener instead of leaving it running.
+    const visibleIds = new Set(activeComps.map(c => c.id));
+    Array.from(openPanelIds).forEach(id => {
+      if (visibleIds.has(id)) return;
+      openPanelIds.delete(id);
+      if (activePanelListeners[id]) { activePanelListeners[id](); delete activePanelListeners[id]; }
+    });
+
     if (activeComps.length === 0) {
       container.innerHTML = `<p style="color:var(--ink-soft);font-size:13.5px;">${t("emptyComps")}</p>`;
       return;
@@ -927,7 +996,13 @@
 
     let html = "";
     for (const c of activeComps) {
-      const stats = getInteractionStats(c.id);
+      const viewed = (c.stats && c.stats.viewed) || 0;
+      const clicked = (c.stats && c.stats.clicked) || 0;
+      const submitted = (c.stats && c.stats.submitted) || 0;
+      // "completed" isn't a server counter yet (deliberately deferred) — show
+      // 0 until this competition's panel has been opened this session, then
+      // keep the real live count from the scoped listener for the rest of it.
+      const completedDisplay = panelCompletedCache[c.id] !== undefined ? panelCompletedCache[c.id] : 0;
       html += `
         <div class="comp-item" data-id="${c.id}">
           <div class="head">
@@ -941,13 +1016,13 @@
             </div>
           </div>
           <div class="funnel">
-            <div class="step"><strong>${stats.viewed}</strong><span>${t("funnelViewed")}</span></div>
-            <div class="step"><strong>${stats.clicked}</strong><span>${t("funnelClicked")}</span></div>
-            <div class="step"><strong>${stats.submitted}</strong><span>${t("funnelSubmitted")}</span></div>
-            <div class="step"><strong>${stats.completed}</strong><span>${t("funnelCompleted")}</span></div>
+            <div class="step"><strong data-stat="viewed">${viewed}</strong><span>${t("funnelViewed")}</span></div>
+            <div class="step"><strong data-stat="clicked">${clicked}</strong><span>${t("funnelClicked")}</span></div>
+            <div class="step"><strong data-stat="submitted">${submitted}</strong><span>${t("funnelSubmitted")}</span></div>
+            <div class="step"><strong data-stat="completed">${completedDisplay}</strong><span>${t("funnelCompleted")}</span></div>
           </div>
           <div class="comp-actions">
-            <button class="btn small secondary" data-action="toggle-students" data-id="${c.id}">${t("btnFollowUp")} (${stats.submitted})</button>
+            <button class="btn small secondary" data-action="toggle-students" data-id="${c.id}">${t("btnFollowUp")} (<span data-stat="submitted-btn">${submitted}</span>)</button>
             <button class="btn small secondary" data-action="photos" data-id="${c.id}">${t("btnManagePhotos")}</button>
             <button class="btn small secondary" data-action="renew" data-id="${c.id}">${t("btnRenew")}</button>
             ${c.status === "open"
@@ -972,6 +1047,20 @@
       btn.addEventListener("click", () => updateDoc(doc(db, "competitions", btn.dataset.id), { status: "open" })));
     container.querySelectorAll('[data-action="delete"]').forEach(btn =>
       btn.addEventListener("click", () => deleteCompetition(btn.dataset.id)));
+
+    // Restore any panels that were open before this rebuild. Their realtime
+    // listener was never torn down, so once redrawn from cache they keep
+    // receiving live updates exactly as if the rebuild never happened.
+    openPanelIds.forEach(id => {
+      const panel = document.getElementById(`students-${id}`);
+      if (!panel) return;
+      panel.style.display = "block";
+      if (panelRowsCache[id]) {
+        renderStudentsPanelHtml(id, panelRowsCache[id]);
+      } else {
+        panel.innerHTML = `<p style="font-size:12.5px;color:var(--ink-soft);margin-top:10px;">${t("loadingStudents")}</p>`;
+      }
+    });
   }
 
   // ---------- Soft delete / trash ----------
@@ -1032,71 +1121,155 @@
   document.getElementById("closeTrashBtn").addEventListener("click", () =>
     document.getElementById("trashModalScrim").classList.remove("show"));
 
-  // ---------- Per-student follow-up table ----------
-  async function toggleStudentsPanel(competitionId) {
+  // ---------- Per-student follow-up table ("Track Students") ----------
+  // Scoped realtime listener, created on open and torn down on close, so a
+  // student event on a DIFFERENT competition can never touch this panel —
+  // and the funnel numbers on the card no longer depend on it at all.
+  function toggleStudentsPanel(competitionId) {
     const panel = document.getElementById(`students-${competitionId}`);
-    if (panel.style.display === "block") { panel.style.display = "none"; return; }
-
-    const rows = await getSubmittedStudents(competitionId);
-
-    if (rows.length === 0) {
-      panel.innerHTML = `<p style="font-size:12.5px;color:var(--ink-soft);margin-top:10px;">${t("emptyStudents")}</p>`;
-      panel.style.display = "block";
+    if (openPanelIds.has(competitionId)) {
+      openPanelIds.delete(competitionId);
+      panel.style.display = "none";
+      if (activePanelListeners[competitionId]) {
+        activePanelListeners[competitionId]();
+        delete activePanelListeners[competitionId];
+      }
       return;
     }
 
-    panel.innerHTML = rows.map(r => {
-      const typeLabel = r.participationType === "team" ? t("typeTeam") : r.participationType === "individual" ? t("typeIndividual") : "";
-      const membersHtml = r.teamMembers && r.teamMembers.length
-        ? `<div class="sc-extra">
-             ${r.teamMembers.map(m => {
-               const mLink = toWaLink(m.phone);
-               const label = `${m.name} (${m.phone})`;
-               return mLink
-                 ? `<a href="${mLink}" target="_blank" rel="noopener" style="color:var(--ink-soft);">${label}</a>`
-                 : label;
-             }).join("<br>")}
-           </div>`
-        : "";
-      const supervisorHtml = r.supervisorName
-        ? `<div class="sc-extra">${t("supervisorPrefix")} ${r.supervisorName}</div>` : "";
-      const notesHtml = r.notes
-        ? `<div class="sc-extra">${t("notesPrefix")} ${r.notes}</div>` : "";
-      const waLink = toWaLink(r.leaderPhone);
-      const dotSpan = `<span class="wa-dot ${r.whatsappJoined ? "joined" : "not-joined"}" title="${r.whatsappJoined ? t("waJoined") : t("waNotJoined")}"></span>`;
-      const phoneHtml = r.leaderPhone
-        ? (waLink
-            ? `<a href="${waLink}" target="_blank" rel="noopener" class="sc-phone">📞 ${r.leaderPhone}${dotSpan}</a>`
-            : `<span class="sc-phone" style="color:var(--ink);">📞 ${r.leaderPhone}${dotSpan}</span>`)
-        : "";
-
-      return `
-        <div class="student-card">
-          <div class="sc-name">${r.name}</div>
-          ${typeLabel ? `<div class="sc-type">${typeLabel}</div>` : ""}
-          ${membersHtml}${supervisorHtml}${notesHtml}
-          <div class="sc-contact-row">
-            ${phoneHtml}
-            ${r.leaderEmail ? `<span class="sc-email">${r.leaderEmail}</span>` : ""}
-          </div>
-          <div class="sc-follow">
-            <select data-comp="${competitionId}" data-student="${r.studentId}" class="follow-select">
-              <option value="registered" ${r.followUpStatus === "registered" ? "selected" : ""}>${t("followRegistered")}</option>
-              <option value="in_progress" ${r.followUpStatus === "in_progress" ? "selected" : ""}>${t("followInProgress")}</option>
-              <option value="completed" ${r.followUpStatus === "completed" ? "selected" : ""}>${t("followCompleted")}</option>
-              <option value="dropped" ${r.followUpStatus === "dropped" ? "selected" : ""}>${t("followDropped")}</option>
-            </select>
-          </div>
-        </div>`;
-    }).join("");
+    openPanelIds.add(competitionId);
     panel.style.display = "block";
+    if (panelRowsCache[competitionId]) {
+      renderStudentsPanelHtml(competitionId, panelRowsCache[competitionId]);
+    } else {
+      panel.innerHTML = `<p style="font-size:12.5px;color:var(--ink-soft);margin-top:10px;">${t("loadingStudents")}</p>`;
+    }
 
+    const q = query(collection(db, "competition_interactions"), where("competitionId", "==", competitionId));
+    let snapshotSeq = 0; // per-listener counter: drops out-of-order async results
+    activePanelListeners[competitionId] = onSnapshot(q, async (snap) => {
+      const mySeq = ++snapshotSeq;
+      const docs = snap.docs.map(d => d.data());
+      const rows = await buildStudentRows(docs);
+      // Superseded by a newer snapshot, or the panel was closed / its
+      // competition removed while names were being resolved.
+      if (mySeq !== snapshotSeq || !openPanelIds.has(competitionId)) return;
+      renderStudentsPanelHtml(competitionId, rows);
+      updateCompletedDisplay(competitionId, rows.filter(r => r.followUpStatus === "completed").length);
+    });
+  }
+
+  // Builds the follow-up table's HTML for one competition's rows and writes
+  // it into that panel, rewiring the follow-up dropdowns — used by the live
+  // listener above and by the restore-after-rebuild logic in
+  // renderCompetitionList().
+  function renderStudentsPanelHtml(competitionId, rows) {
+    panelRowsCache[competitionId] = rows;
+    const panel = document.getElementById(`students-${competitionId}`);
+    if (!panel) return; // not currently in the DOM (mid full-rebuild); cache above covers the next redisplay
+
+    let html;
+    if (rows.length === 0) {
+      html = `<p style="font-size:12.5px;color:var(--ink-soft);margin-top:10px;">${t("emptyStudents")}</p>`;
+    } else {
+      html = rows.map(r => {
+        const typeLabel = r.participationType === "team" ? t("typeTeam") : r.participationType === "individual" ? t("typeIndividual") : "";
+        const membersHtml = r.teamMembers && r.teamMembers.length
+          ? `<div class="sc-extra">
+               ${r.teamMembers.map(m => {
+                 const mLink = toWaLink(m.phone);
+                 const label = `${escapeHtml(m.name)} (${escapeHtml(m.phone)})`;
+                 return mLink
+                   ? `<a href="${mLink}" target="_blank" rel="noopener" style="color:var(--ink-soft);">${label}</a>`
+                   : label;
+               }).join("<br>")}
+             </div>`
+          : "";
+        const supervisorHtml = r.supervisorName
+          ? `<div class="sc-extra">${t("supervisorPrefix")} ${escapeHtml(r.supervisorName)}</div>` : "";
+        const notesHtml = r.notes
+          ? `<div class="sc-extra">${t("notesPrefix")} ${escapeHtml(r.notes)}</div>` : "";
+        const waLink = toWaLink(r.leaderPhone);
+        const dotSpan = `<span class="wa-dot ${r.whatsappJoined ? "joined" : "not-joined"}" title="${r.whatsappJoined ? t("waJoined") : t("waNotJoined")}"></span>`;
+        const phoneHtml = r.leaderPhone
+          ? (waLink
+              ? `<a href="${waLink}" target="_blank" rel="noopener" class="sc-phone">📞 ${escapeHtml(r.leaderPhone)}${dotSpan}</a>`
+              : `<span class="sc-phone" style="color:var(--ink);">📞 ${escapeHtml(r.leaderPhone)}${dotSpan}</span>`)
+          : "";
+
+        return `
+          <div class="student-card">
+            <div class="sc-name">${escapeHtml(r.name)}</div>
+            ${typeLabel ? `<div class="sc-type">${typeLabel}</div>` : ""}
+            ${membersHtml}${supervisorHtml}${notesHtml}
+            <div class="sc-contact-row">
+              ${phoneHtml}
+              ${r.leaderEmail ? `<span class="sc-email">${escapeHtml(r.leaderEmail)}</span>` : ""}
+            </div>
+            <div class="sc-follow">
+              <select data-comp="${competitionId}" data-student="${r.studentId}" class="follow-select">
+                <option value="registered" ${r.followUpStatus === "registered" ? "selected" : ""}>${t("followRegistered")}</option>
+                <option value="in_progress" ${r.followUpStatus === "in_progress" ? "selected" : ""}>${t("followInProgress")}</option>
+                <option value="completed" ${r.followUpStatus === "completed" ? "selected" : ""}>${t("followCompleted")}</option>
+                <option value="dropped" ${r.followUpStatus === "dropped" ? "selected" : ""}>${t("followDropped")}</option>
+              </select>
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    panel.innerHTML = html;
     panel.querySelectorAll(".follow-select").forEach(sel => {
       sel.addEventListener("change", async () => {
         const docId = `${sel.dataset.comp}_${sel.dataset.student}`;
         await updateDoc(doc(db, "competition_interactions", docId), { followUpStatus: sel.value });
       });
     });
+  }
+
+  // Patches just the "completed" number on one competition's card — the one
+  // funnel figure not covered by competitions/{id}.stats yet (deliberately
+  // deferred to a later pass).
+  function updateCompletedDisplay(competitionId, count) {
+    panelCompletedCache[competitionId] = count;
+    const card = document.querySelector(`.comp-item[data-id="${competitionId}"]`);
+    if (!card) return;
+    const el = card.querySelector('[data-stat="completed"]');
+    if (el) el.textContent = count;
+  }
+
+  // Shared row-builder: given a competition's raw interaction docs, returns
+  // the submitted-only rows with student names resolved — used by both the
+  // live panel listener above and the one-time winners-picker fetch below.
+  async function buildStudentRows(docs) {
+    const submitted = docs.filter(d => d.formSubmittedAt);
+    return Promise.all(submitted.map(async (d) => {
+      // Only very old records (saved before the in-app registration form
+      // existed) have no leaderName — read the account name only for those,
+      // and cache it, instead of one users/{uid} read per student per snapshot.
+      const name = d.leaderName || (await getUserFullName(d.studentId)) || d.studentId;
+      return {
+        studentId: d.studentId,
+        name,
+        followUpStatus: d.followUpStatus || "registered",
+        participationType: d.participationType || null,
+        leaderPhone: d.leaderPhone || null,
+        leaderEmail: d.leaderEmail || null,
+        supervisorName: d.supervisorName || null,
+        teamMembers: d.teamMembers || [],
+        notes: d.notes || null,
+        whatsappJoined: !!d.whatsappJoinedAt,
+      };
+    }));
+  }
+
+  // One-time (non-realtime) fetch for the winners picker — it only needs a
+  // snapshot at the moment the admin opens "Close & publish results", not a
+  // live subscription.
+  async function fetchSubmittedStudentsOnce(competitionId) {
+    const snap = await getDocs(query(collection(db, "competition_interactions"), where("competitionId", "==", competitionId)));
+    const docs = snap.docs.map(d => d.data());
+    return buildStudentRows(docs);
   }
 
   // ---------- Competition media (photos) ----------
@@ -1420,7 +1593,7 @@
     document.getElementById("winnerInputs").innerHTML = `<p style="font-size:12.5px;color:var(--ink-soft);">${t("loadingStudents")}</p>`;
     document.getElementById("winModalScrim").classList.add("show");
 
-    const submitted = await getSubmittedStudents(competitionId);
+    const submitted = await fetchSubmittedStudentsOnce(competitionId);
     document.getElementById("winnerInputs").innerHTML = "";
 
     if (submitted.length === 0) {
@@ -1445,7 +1618,7 @@
       <input type="number" class="rank" value="${rank}" min="1">
       <select class="winner-select">
         <option value="" disabled selected>${t("selectWinnerPlaceholder")}</option>
-        ${winnerCandidates.map(s => `<option value="${s.studentId}">${s.name}</option>`).join("")}
+        ${winnerCandidates.map(s => `<option value="${s.studentId}">${escapeHtml(s.name)}</option>`).join("")}
       </select>`;
     wrap.appendChild(row);
   }
@@ -1487,14 +1660,82 @@
     document.getElementById("winModalScrim").classList.remove("show");
   });
 
-  // ---------- Leaderboard ----------
-  // Built once per load and reused by BOTH leaderboards' click-through modal.
+   // ---------- Leaderboard ----------
+  // Loaded on demand (when its tab opens), NOT via a realtime listener.
+  // One query reads ONLY interaction docs with a submitted registration
+  // (formSubmittedAt is a Timestamp, so "> epoch" matches exactly those and
+  // needs no composite index). The result is cached for LEADERBOARD_TTL_MS;
+  // rendering is separate and costs no reads.
+
+  function getUserFullName(uid) {
+    if (!userNameCache.has(uid)) {
+      userNameCache.set(uid,
+        getDoc(doc(db, "users", uid))
+          .then(s => (s.exists() ? (s.data().fullName || uid) : null))
+          .catch(err => { userNameCache.delete(uid); throw err; })
+      );
+    }
+    return userNameCache.get(uid);
+  }
+
+  async function fetchLeaderboardInteractions() {
+    const fresh = leaderboardInteractions && (Date.now() - leaderboardFetchedAt) < LEADERBOARD_TTL_MS;
+    if (fresh) return leaderboardInteractions;
+    if (leaderboardFetchPromise) return leaderboardFetchPromise;
+
+    leaderboardFetchPromise = (async () => {
+      try {
+        const snap = await getDocs(query(
+          collection(db, "competition_interactions"),
+          where("formSubmittedAt", ">", new Date(0))
+        ));
+        leaderboardInteractions = snap.docs.map(d => d.data());
+        leaderboardFetchedAt = Date.now();
+        return leaderboardInteractions;
+      } finally {
+        leaderboardFetchPromise = null;
+      }
+    })();
+    return leaderboardFetchPromise;
+  }
+
+  // Walks a sorted [uid, value] list and returns up to `limit` entries whose
+  // user account still exists. Only uids not seen before cost a read, and only
+  // as many as needed to fill the top N.
+  async function resolveTopWithNames(sorted, limit) {
+    const out = [];
+    let i = 0;
+    while (out.length < limit && i < sorted.length) {
+      const chunk = sorted.slice(i, i + (limit - out.length));
+      i += chunk.length;
+      const names = await Promise.all(chunk.map(([uid]) => getUserFullName(uid)));
+      chunk.forEach(([uid, value], idx) => {
+        if (names[idx] !== null) out.push({ uid, name: names[idx], value });
+      });
+    }
+    return out;
+  }
+
   async function loadLeaderboard() {
+    try {
+      await fetchLeaderboardInteractions();
+    } catch (err) {
+      console.error("leaderboard fetch error:", err); // fall back to last known cache, if any
+    }
+    try {
+      await renderLeaderboard();
+    } catch (err) {
+      console.error("leaderboard render error:", err);
+    }
+  }
+
+  async function renderLeaderboard() {
+    if (!leaderboardInteractions) return;
+    const myToken = ++leaderboardRenderToken;
+
     // Freeze ONE consistent view of "competitions" for this whole run.
     const comps = competitions.filter(c => !c.deleted);
 
-    // competitionId -> title, `${competitionId}_${studentId}` -> rank, and
-    // win tallies — all built from the single frozen snapshot above.
     const titleById = {};
     const rankByCompStudent = {};
     const winCounts = {};
@@ -1510,17 +1751,14 @@
     });
 
     const activeCompIds = new Set(comps.map(c => c.id));
-
-    const byStudent = {};
-    studentDetailsMap = {};
-    allInteractions.forEach((data) => {
-      if (!data.formSubmittedAt) return; // only count/list completed registrations
-      if (!activeCompIds.has(data.competitionId)) return; // skip interactions tied to a deleted competition
-      if (!byStudent[data.studentId]) byStudent[data.studentId] = { submissions: 0 };
-      byStudent[data.studentId].submissions++;
-
-      if (!studentDetailsMap[data.studentId]) studentDetailsMap[data.studentId] = [];
-      studentDetailsMap[data.studentId].push({
+    const submissionsByStudent = {};
+    const nextDetails = {};
+    leaderboardInteractions.forEach((data) => {
+      if (!data.formSubmittedAt) return;
+      if (!activeCompIds.has(data.competitionId)) return; // skip deleted competitions
+      submissionsByStudent[data.studentId] = (submissionsByStudent[data.studentId] || 0) + 1;
+      if (!nextDetails[data.studentId]) nextDetails[data.studentId] = [];
+      nextDetails[data.studentId].push({
         title: titleById[data.competitionId] || data.competitionId,
         rank: rankByCompStudent[`${data.competitionId}_${data.studentId}`] || null,
         participationType: data.participationType || null,
@@ -1528,51 +1766,36 @@
       });
     });
     // Competitions with a result come first, best rank first.
-    Object.values(studentDetailsMap).forEach(list =>
+    Object.values(nextDetails).forEach(list =>
       list.sort((a, b) => (a.rank ? a.rank : 999) - (b.rank ? b.rank : 999)));
 
-    const entriesRaw = await Promise.all(Object.entries(byStudent).map(async ([uid, v]) => {
-      const uSnap = await getDoc(doc(db, "users", uid));
-      // The user account behind this uid was deleted (e.g. recreated with a
-      // new account) — no real name to show, so skip it from the board
-      // instead of leaking the raw uid string.
-      if (!uSnap.exists()) return null;
-      return { uid, name: uSnap.data().fullName || uid, submissions: v.submissions };
-    }));
-    const entries = entriesRaw.filter(Boolean);
+    const participationSorted = Object.entries(submissionsByStudent).sort((a, b) => b[1] - a[1]);
+    const winnersSorted = Object.entries(winCounts).sort((a, b) => b[1] - a[1]);
+    const [top, winEntries] = await Promise.all([
+      resolveTopWithNames(participationSorted, 10),
+      resolveTopWithNames(winnersSorted, 10),
+    ]);
 
-    entries.sort((a, b) => b.submissions - a.submissions);
-    const top = entries.slice(0, 10);
+    // A newer render started while names were loading — let it own the DOM.
+    if (myToken !== leaderboardRenderToken) return;
+    studentDetailsMap = nextDetails;
 
     document.getElementById("lbParticipation").innerHTML = top.map((e, i) => `
-      <div class="lb-row lb-row-clickable" data-uid="${e.uid}" data-name="${e.name.replace(/"/g, "&quot;")}" data-mode="all">
+      <div class="lb-row lb-row-clickable" data-uid="${e.uid}" data-name="${escapeHtml(e.name)}" data-mode="all">
         <span class="lb-rank ${i === 0 ? "gold" : ""}">${i + 1}</span>
-        <div class="info"><strong>${e.name}</strong><span>${t("lbParticipationSub")}</span></div>
-        <div class="count"><strong>${e.submissions}</strong><span>${t("unitCompetition")}</span></div>
+        <div class="info"><strong>${escapeHtml(e.name)}</strong><span>${t("lbParticipationSub")}</span></div>
+        <div class="count"><strong>${e.value}</strong><span>${t("unitCompetition")}</span></div>
       </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px;">${t("noDataYet")}</p>`;
 
-    // Winners leaderboard: tally rank appearances across closed competitions,
-    // grouped by studentId (not name) — safe against duplicate/similar names.
-    const winEntriesRaw = await Promise.all(
-      Object.entries(winCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(async ([studentId, count]) => {
-          const uSnap = await getDoc(doc(db, "users", studentId));
-          if (!uSnap.exists()) return null;
-          return { studentId, name: uSnap.data().fullName || studentId, count };
-        })
-    );
-    const winEntries = winEntriesRaw.filter(Boolean);
-    document.getElementById("lbWinners").innerHTML = winEntries.map(({ studentId, name, count }, i) => `
-      <div class="lb-row lb-row-clickable" data-uid="${studentId}" data-name="${name.replace(/"/g, "&quot;")}" data-mode="winners">
+    document.getElementById("lbWinners").innerHTML = winEntries.map((e, i) => `
+      <div class="lb-row lb-row-clickable" data-uid="${e.uid}" data-name="${escapeHtml(e.name)}" data-mode="winners">
         <span class="lb-rank ${i === 0 ? "gold" : ""}">${i + 1}</span>
-        <div class="info"><strong>${name}</strong><span>${t("lbWinnersSub")}</span></div>
-        <div class="count"><strong>${count}</strong><span>${t("unitRank")}</span></div>
+        <div class="info"><strong>${escapeHtml(e.name)}</strong><span>${t("lbWinnersSub")}</span></div>
+        <div class="count"><strong>${e.value}</strong><span>${t("unitRank")}</span></div>
       </div>`).join("") || `<p style="color:var(--ink-soft);font-size:13px;">${t("noResultsYet")}</p>`;
 
     document.querySelectorAll(".lb-row-clickable").forEach(row =>
-    row.addEventListener("click", () => openStudentDetailModal(row.dataset.uid, row.dataset.name, row.dataset.mode)));
+      row.addEventListener("click", () => openStudentDetailModal(row.dataset.uid, row.dataset.name, row.dataset.mode)));
   }
 
   // ---------- Student drill-down modal (used by both leaderboards) ----------
@@ -1583,7 +1806,7 @@
     document.getElementById("winnerDetailList").innerHTML = details.map(d => {
       const rankLabel = d.rank ? t("rankLabel")(d.rank) : t("noRankLabel");
       const typeLabel = d.participationType === "team" ? t("typeTeam") : d.participationType === "individual" ? t("typeIndividual") : t("typeUnknown");
-      const supervisorLabel = d.supervisorName ? t("supervisorWith")(d.supervisorName) : t("supervisorWithout");
+      const supervisorLabel = d.supervisorName ? t("supervisorWith")(escapeHtml(d.supervisorName)) : t("supervisorWithout");
       return `
         <div class="winner-detail-row">
           <div class="winner-detail-rank ${d.rank ? "" : "no-rank"}">${d.rank || "—"}</div>

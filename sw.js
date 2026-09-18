@@ -22,7 +22,16 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(APP_SHELL_CACHE).then((cache) => cache.addAll(APP_SHELL_FILES))
   );
-  self.skipWaiting();
+  // Do NOT auto skipWaiting anymore — a new SW now waits until the page
+  // explicitly asks it to activate (see the "message" listener below), so
+  // an update prompt can be shown first instead of silently switching
+  // versions under an open session.
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 // ---------- Activate: clean up old cache versions ----------
@@ -139,32 +148,4 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
-// ---------- Background Sync ----------
-// Queues interactions (e.g. link clicks) recorded while offline
-// and flushes them to the backend once connectivity returns.
-self.addEventListener("sync", (event) => {
-  if (event.tag === "sync-interactions") {
-    event.waitUntil(flushQueuedInteractions());
-  }
-});
-
-async function flushQueuedInteractions() {
-  const cache = await caches.open(DATA_CACHE);
-  const queued = await cache.match("queued-interactions");
-  if (!queued) return;
-
-  const items = await queued.json();
-  for (const item of items) {
-    try {
-      await fetch("/api/interactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(item)
-      });
-    } catch (e) {
-      // still offline — leave the queue intact and try again next sync
-      return;
-    }
-  }
-  await cache.delete("queued-interactions");
-}
+ 

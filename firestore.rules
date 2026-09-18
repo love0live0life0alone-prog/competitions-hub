@@ -44,11 +44,13 @@ service cloud.firestore {
 
     // ---- competition_interactions ----
     match /competition_interactions/{docId} {
-      // A student may only read/write their own interaction record.
+      // Written exclusively by the Flask backend (Admin SDK — bypasses these
+      // rules) via /api/interactions, which also maintains the matching
+      // competitions/{id}.stats counters in the same transaction. Students
+      // never write here directly; only reading their own record is allowed.
       allow read: if isUniversityAccount()
+                  && resource != null
                   && resource.data.studentId == request.auth.uid;
-      allow create, update: if isUniversityAccount()
-                  && request.resource.data.studentId == request.auth.uid;
       allow read, write: if isAdmin();
     }
 

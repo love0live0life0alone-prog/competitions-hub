@@ -102,6 +102,15 @@ def create_competition():
         "status": "open",
         "createdBy": decoded["uid"],
         "createdAt": firestore.SERVER_TIMESTAMP,
+        # Funnel counters start at 0. apply_interaction_transaction() updates
+        # them with dotted paths ("stats.viewed" ...), which is compatible with
+        # this map (and would also work without it).
+        "stats": {
+            "viewed": 0,
+            "clicked": 0,
+            "submitted": 0,
+            "whatsappJoined": 0,
+        },
     })
 
     send_push(
@@ -114,6 +123,75 @@ def create_competition():
     return jsonify({"id": competition_ref.id}), 201
 
 
+# ---------- Business-rule errors for the "submit" event ----------
+# RegistrationClosedError mirrors the exact applicationOpen check already
+# computed client-side in home.html (status == "open" and now < the
+# application deadline) — this is not a new rule, just making the existing
+# UI rule authoritative on the server too.
+class RegistrationClosedError(Exception):
+    pass
+
+
+# DuplicateSubmissionError codifies what the front-end already assumes: once
+# formSubmittedAt exists, home.html hides the "Apply now" button and shows
+# the registered-box instead, i.e. one submission per (student, competition).
+class DuplicateSubmissionError(Exception):
+    pass
+
+
+# ---------- Unique-student funnel counters ----------
+# Each event's "first happened at" timestamp on the interaction doc IS the
+# de-duplication marker for its matching competitions/{id}.stats.<key>
+# counter — no separate idempotency store needed. A transaction reads both
+# documents first, decides whether this is the first time THIS student has
+# triggered THIS event for THIS competition, writes the interaction doc
+# exactly as before, and only increments the counter if it wasn't already
+# set. Concurrent requests and client retries are both safe: Firestore
+# transactions serialize conflicting reads/writes on the same documents and
+# retry the loser with a fresh read, so exactly one increment ever happens
+# per (student, event, competition), no matter how many times it's sent.
+@firestore.transactional
+def apply_interaction_transaction(transaction, interaction_ref, competition_ref, update_payload, field_name, stat_key, event_type=None):
+    interaction_snap = interaction_ref.get(transaction=transaction)
+    competition_snap = competition_ref.get(transaction=transaction)
+
+    if not competition_snap.exists:
+        raise LookupError("competition not found")
+
+    interaction_data = interaction_snap.to_dict() if interaction_snap.exists else {}
+    already_counted = bool(interaction_data.get(field_name))
+    competition_data = competition_snap.to_dict()
+
+    if competition_data.get("deleted"):
+        raise RegistrationClosedError("competition deleted")
+
+    if event_type == "submit":
+        if competition_data.get("status") != "open":
+            raise RegistrationClosedError("competition not open")
+        app_deadline = competition_data.get("applicationDeadline") or competition_data.get("deadline")
+        if app_deadline:
+            try:
+                deadline_dt = datetime.fromisoformat(app_deadline)
+            except (ValueError, TypeError):
+                deadline_dt = None  # unparsable deadline never blocks submission — same leniency the cron job already uses
+            if deadline_dt is not None:
+                # A naive deadline (no timezone/offset — e.g. from a datetime-local
+                # input in admin.html) is treated as Egypt local time, matching
+                # every other deadline comparison in this file. An aware deadline
+                # (has an explicit offset) is compared as-is — never mix naive
+                # and aware datetimes.
+                if deadline_dt.tzinfo is None:
+                    deadline_dt = deadline_dt.replace(tzinfo=EGYPT_TZ)
+                if datetime.now(EGYPT_TZ) >= deadline_dt:
+                    raise RegistrationClosedError("application deadline passed")
+        if already_counted:
+            raise DuplicateSubmissionError("already submitted")
+
+    transaction.set(interaction_ref, update_payload, merge=True)
+    if not already_counted:
+        transaction.update(competition_ref, {f"stats.{stat_key}": firestore.Increment(1)})
+
+
 # ---------- Log a student interaction (view / click / submit) ----------
 @app.route("/api/interactions", methods=["POST"])
 def log_interaction():
@@ -121,16 +199,13 @@ def log_interaction():
     if not decoded:
         return jsonify({"error": "unauthorized"}), 401
 
-    data = request.get_json()
-    doc_id = f"{data['competitionId']}_{decoded['uid']}"
-    ref = db.collection("competition_interactions").document(doc_id)
+    data = request.get_json(silent=True) or {}
+    competition_id = data.get("competitionId")
+    event_type = data.get("event")  # "view" | "click" | "submit" | "whatsapp_join"
 
-    update_payload = {
-        "competitionId": data["competitionId"],
-        "studentId": decoded["uid"],
-        "lastUpdatedAt": firestore.SERVER_TIMESTAMP,
-    }
-    event_type = data["event"]  # "view" | "click" | "submit" | "whatsapp_join"
+    if not competition_id or not isinstance(competition_id, str):
+        return jsonify({"error": "competitionId required"}), 400
+
     field_map = {
         "view": "viewedAt",
         "click": "clickedLinkAt",
@@ -141,30 +216,57 @@ def log_interaction():
         # external-form problem this whole flow was built to avoid.
         "whatsapp_join": "whatsappJoinedAt",
     }
-    if event_type in field_map:
-        update_payload[field_map[event_type]] = firestore.SERVER_TIMESTAMP
+    stat_key_map = {
+        "view": "viewed",
+        "click": "clicked",
+        "submit": "submitted",
+        "whatsapp_join": "whatsappJoined",
+    }
+    if event_type not in field_map:
+        return jsonify({"error": "invalid event"}), 400
+
+    ref = db.collection("competition_interactions").document(f"{competition_id}_{decoded['uid']}")
+    competition_ref = db.collection("competitions").document(competition_id)
+
+    update_payload = {
+        "competitionId": competition_id,
+        "studentId": decoded["uid"],
+        "lastUpdatedAt": firestore.SERVER_TIMESTAMP,
+    }
+    update_payload[field_map[event_type]] = firestore.SERVER_TIMESTAMP
 
     # "submit" carries the in-app registration form (team/leader/contact
     # details) collected right after the student presses "Apply now" —
     # this is what actually drives the funnel + admin follow-up table,
     # instead of relying on an external form we have no visibility into.
     if event_type == "submit":
-        registration = data.get("registration") or {}
+        registration = data.get("registration")
+        if not isinstance(registration, dict):
+            return jsonify({"error": "registration must be an object"}), 400
+
+        def _clean_str(value):
+            return value.strip() if isinstance(value, str) else ""
+
         participation_type = registration.get("participationType")
         if participation_type not in ("individual", "team"):
             return jsonify({"error": "invalid participationType"}), 400
 
-        leader_name = (registration.get("leaderName") or "").strip()
-        leader_phone = (registration.get("leaderPhone") or "").strip()
-        leader_email = (registration.get("leaderEmail") or "").strip()
+        leader_name = _clean_str(registration.get("leaderName"))
+        leader_phone = _clean_str(registration.get("leaderPhone"))
+        leader_email = _clean_str(registration.get("leaderEmail"))
         if not leader_name or not leader_phone or not leader_email:
             return jsonify({"error": "missing required registration fields"}), 400
 
         team_members = []
         if participation_type == "team":
-            for m in registration.get("teamMembers", []):
-                name = (m.get("name") or "").strip()
-                phone = (m.get("phone") or "").strip()
+            raw_members = registration.get("teamMembers") or []
+            if not isinstance(raw_members, list):
+                return jsonify({"error": "teamMembers must be a list"}), 400
+            for m in raw_members:
+                if not isinstance(m, dict):
+                    return jsonify({"error": "invalid teamMembers entry"}), 400
+                name = _clean_str(m.get("name"))
+                phone = _clean_str(m.get("phone"))
                 if name and phone:
                     team_members.append({"name": name, "phone": phone})
 
@@ -173,12 +275,23 @@ def log_interaction():
             "leaderName": leader_name,
             "leaderPhone": leader_phone,
             "leaderEmail": leader_email,
-            "supervisorName": (registration.get("supervisorName") or "").strip() or None,
+            "supervisorName": _clean_str(registration.get("supervisorName")) or None,
             "teamMembers": team_members,
-            "notes": (registration.get("notes") or "").strip() or None,
+            "notes": _clean_str(registration.get("notes")) or None,
         })
 
-    ref.set(update_payload, merge=True)
+    try:
+        apply_interaction_transaction(
+            db.transaction(), ref, competition_ref, update_payload,
+            field_map[event_type], stat_key_map[event_type], event_type,
+        )
+    except LookupError:
+        return jsonify({"error": "competition not found"}), 404
+    except RegistrationClosedError:
+        return jsonify({"error": "registration closed"}), 403
+    except DuplicateSubmissionError:
+        return jsonify({"error": "already submitted"}), 409
+
     return jsonify({"ok": True})
 
 
@@ -323,7 +436,7 @@ def deadline_reminders():
     if not CRON_SECRET or request.headers.get("X-Cron-Secret") != CRON_SECRET:
         return jsonify({"error": "forbidden"}), 403
 
-    now = datetime.now(EGYPT_TZ).replace(tzinfo=None)
+    now = datetime.now(EGYPT_TZ)
     sent = []
 
     for doc_snap in db.collection("competitions").where("status", "==", "open").stream():
@@ -333,8 +446,13 @@ def deadline_reminders():
             continue
         try:
             deadline = datetime.fromisoformat(deadline_str)
-        except ValueError:
+        except (ValueError, TypeError):
             continue
+        # A naive deadline (no timezone/offset) is treated as Egypt local
+        # time — same convention used in apply_interaction_transaction().
+        # An aware deadline (has an explicit offset) is compared as-is.
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=EGYPT_TZ)
 
         hours_left = (deadline - now).total_seconds() / 3600
 
