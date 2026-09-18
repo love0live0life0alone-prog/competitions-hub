@@ -877,8 +877,62 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
     return `<button type="button" class="cta-link" id="ctaApplyBtn" style="width:100%;border:none;cursor:pointer;">${strings[current].applyNow}</button>`;
   }
 
-  // ---------- Media gallery ----------
-  let galleryImages = [];
+  function renderGalleryHtml(images) {
+    if (!images.length) return "";
+    return `
+      <div class="gallery-wrap">
+        <div class="gallery-track" id="galleryTrack">
+          ${images.map((img, i) => `
+            <div class="gallery-slide" data-index="${i}">
+              <img src="${img.url}" loading="${i === 0 ? "eager" : "lazy"}" alt="${img.caption || ""}">
+            </div>`).join("")}
+        </div>
+        ${images.length > 1 ? `<span class="gallery-counter" id="galleryCounter">1 / ${images.length}</span>` : ""}
+      </div>`;
+  }  function renderGalleryHtml(images) {
+    if (!images.length) return "";
+    return `
+      <div class="gallery-wrap">
+        <div class="gallery-track" id="galleryTrack">
+          ${images.map((img, i) => {
+            const cx = (img.crop && typeof img.crop.x === "number") ? img.crop.x : 0.5;
+            const cy = (img.crop && typeof img.crop.y === "number") ? img.crop.y : 0.5;
+            return `
+            <div class="gallery-slide" data-index="${i}">
+              <img src="${img.url}" loading="${i === 0 ? "eager" : "lazy"}" alt="${img.caption || ""}" style="object-position:${(cx * 100).toFixed(1)}% ${(cy * 100).toFixed(1)}%;">
+            </div>`;
+          }).join("")}
+        </div>
+        ${images.length > 1 ? `<span class="gallery-counter" id="galleryCounter">1 / ${images.length}</span>` : ""}
+      </div>`;
+  }
+  let galleryTrackEl = null;
+  let galleryAutoplayTimer = null;
+  let galleryAutoplayPausedForLightbox = false;
+
+  function stopGalleryAutoplay() {
+    if (galleryAutoplayTimer) { clearInterval(galleryAutoplayTimer); galleryAutoplayTimer = null; }
+  }
+
+  function currentGalleryIndex() {
+    if (!galleryTrackEl || !galleryTrackEl.clientWidth) return 0;
+    return Math.round(galleryTrackEl.scrollLeft / galleryTrackEl.clientWidth);
+  }
+
+  function scrollGalleryTo(index, smooth) {
+    if (!galleryTrackEl) return;
+    galleryTrackEl.scrollTo({ left: index * galleryTrackEl.clientWidth, behavior: smooth ? "smooth" : "auto" });
+  }
+
+  function startGalleryAutoplay() {
+    stopGalleryAutoplay();
+    if (!galleryTrackEl || galleryImages.length < 2 || galleryAutoplayPausedForLightbox) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    galleryAutoplayTimer = setInterval(() => {
+      const next = (currentGalleryIndex() + 1) % galleryImages.length;
+      scrollGalleryTo(next, !reduceMotion);
+    }, 3500);
+  }
 
   async function getCompetitionMedia(competitionId) {
     try {
@@ -908,7 +962,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   function wireGalleryEvents(images) {
     galleryImages = images;
     const track = document.getElementById("galleryTrack");
-    if (!track) return;
+    galleryTrackEl = track;
+    if (!track) { stopGalleryAutoplay(); return; }
 
     track.querySelectorAll(".gallery-slide").forEach(slide => {
       slide.addEventListener("click", () => openLightbox(Number(slide.dataset.index)));
@@ -916,11 +971,18 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
 
     if (images.length > 1) {
       const counter = document.getElementById("galleryCounter");
+      let settleTimer = null;
       track.addEventListener("scroll", () => {
         const idx = Math.round(track.scrollLeft / track.clientWidth);
         counter.textContent = `${idx + 1} / ${images.length}`;
+        // السحب اليدوي بيولّد أحداث scroll كتير ورا بعض أثناء الحركة؛
+        // لما الحركة تستقر، نعيد ضبط تايمر الأوتوبلاي من الصورة الحالية.
+        clearTimeout(settleTimer);
+        settleTimer = setTimeout(startGalleryAutoplay, 250);
       });
     }
+
+    startGalleryAutoplay();
   }
 
   let lightboxIndex = 0;
@@ -928,9 +990,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
     lightboxIndex = index;
     updateLightbox();
     document.getElementById("lightbox").classList.add("open");
+    galleryAutoplayPausedForLightbox = true;
+    stopGalleryAutoplay();
   }
   function closeLightbox() {
     document.getElementById("lightbox").classList.remove("open");
+    galleryAutoplayPausedForLightbox = false;
+    startGalleryAutoplay();
   }
   function updateLightbox() {
     const img = galleryImages[lightboxIndex];
@@ -1057,6 +1123,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   function closeDetail(opts = {}) {
     const { fromPopstate = false } = opts;
     document.getElementById("detailOverlay").classList.remove("open");
+        stopGalleryAutoplay();
     activeDetailId = null;
 
     if (!fromPopstate) {
