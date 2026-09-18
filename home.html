@@ -882,18 +882,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
     return `
       <div class="gallery-wrap">
         <div class="gallery-track" id="galleryTrack">
-          ${images.map((img, i) => `
-            <div class="gallery-slide" data-index="${i}">
-              <img src="${img.url}" loading="${i === 0 ? "eager" : "lazy"}" alt="${img.caption || ""}">
-            </div>`).join("")}
-        </div>
-        ${images.length > 1 ? `<span class="gallery-counter" id="galleryCounter">1 / ${images.length}</span>` : ""}
-      </div>`;
-  }  function renderGalleryHtml(images) {
-    if (!images.length) return "";
-    return `
-      <div class="gallery-wrap">
-        <div class="gallery-track" id="galleryTrack">
           ${images.map((img, i) => {
             const cx = (img.crop && typeof img.crop.x === "number") ? img.crop.x : 0.5;
             const cy = (img.crop && typeof img.crop.y === "number") ? img.crop.y : 0.5;
@@ -943,20 +931,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       console.error("media load error:", e);
       return [];
     }
-  }
-
-  function renderGalleryHtml(images) {
-    if (!images.length) return "";
-    return `
-      <div class="gallery-wrap">
-        <div class="gallery-track" id="galleryTrack">
-          ${images.map((img, i) => `
-            <div class="gallery-slide" data-index="${i}">
-              <img src="${img.url}" loading="${i === 0 ? "eager" : "lazy"}" alt="${img.caption || ""}">
-            </div>`).join("")}
-        </div>
-        ${images.length > 1 ? `<span class="gallery-counter" id="galleryCounter">1 / ${images.length}</span>` : ""}
-      </div>`;
   }
 
   function wireGalleryEvents(images) {
@@ -1123,7 +1097,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   function closeDetail(opts = {}) {
     const { fromPopstate = false } = opts;
     document.getElementById("detailOverlay").classList.remove("open");
-        stopGalleryAutoplay();
+    stopGalleryAutoplay();
     activeDetailId = null;
 
     if (!fromPopstate) {

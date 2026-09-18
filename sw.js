@@ -69,8 +69,13 @@ self.addEventListener("fetch", (event) => {
     caches.match(request).then((cached) => {
       const network = fetch(request)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(APP_SHELL_CACHE).then((cache) => cache.put(request, clone));
+          // الكاش الوسيط بيدعم بس طلبات GET على http/https — أي حاجة تانية
+          // (POST، أو طلبات إضافات كروم زي chrome-extension://) لازم تتجاهل
+          // هنا عشان متعملش reject/uncaught error، مع إنها مش مشكلة حقيقية.
+          if (request.method === "GET" && request.url.startsWith("http")) {
+            const clone = response.clone();
+            caches.open(APP_SHELL_CACHE).then((cache) => cache.put(request, clone));
+          }
           return response;
         })
         .catch(() => cached);
