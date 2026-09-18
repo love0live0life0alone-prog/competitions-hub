@@ -592,6 +592,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   let current = localStorage.getItem("uch_lang") === "ar" ? "ar" : "en";
   let currentDetailId = null;
   let regParticipationType = "individual";
+  // بيحفظ id المسابقة اللي التفاصيل بتاعتها متفتحة دلوقتي، مستخدم بس عشان زرار الرجوع
+  let activeDetailId = null;
 
   // Canonical value stays Arabic (so stored Firestore data never changes),
   // only the displayed label switches with the language.
@@ -661,7 +663,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   function openFromUrlIfNeeded() {
     const params = new URLSearchParams(location.search);
     const targetId = params.get("competition");
-    if (!targetId) return;
+    if (!targetId) {
+      if (!history.state) history.replaceState({ competition: null }, "", location.pathname + location.search);
+      return;
+    }
+    history.replaceState({ competition: null }, "", "home.html");
     const tryOpen = () => {
       if (competitions.some(c => c.id === targetId)) openDetail(targetId);
       else setTimeout(tryOpen, 300);
@@ -915,9 +921,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   });
 
   // ---------- Detail overlay ----------
-  async function openDetail(id) {
+  async function openDetail(id, opts = {}) {
+    const { fromPopstate = false, pushHistory = true } = opts;
     const c = competitions.find(x => x.id === id);
     if (!c) return;
+    const wasAlreadyOpen = document.getElementById("detailOverlay").classList.contains("open");
     logInteraction(id, "view");
 
     const body = document.getElementById("detailBody");
@@ -990,9 +998,44 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
     wireGalleryEvents(mediaImages);
 
     document.getElementById("detailOverlay").classList.add("open");
+    activeDetailId = id;
+
+    if (pushHistory && !fromPopstate) {
+      const url = `home.html?competition=${id}`;
+      if (history.state && history.state.competition === id) {
+        // already this state — do nothing
+      } else if (wasAlreadyOpen) {
+        history.replaceState({ competition: id }, "", url);
+      } else {
+        history.pushState({ competition: id }, "", url);
+      }
+    }
   }
-  document.getElementById("closeDetailBtn").addEventListener("click", () => {
+
+  function closeDetail(opts = {}) {
+    const { fromPopstate = false } = opts;
     document.getElementById("detailOverlay").classList.remove("open");
+    activeDetailId = null;
+
+    if (!fromPopstate) {
+      if (history.state && history.state.competition) {
+        history.back();
+      } else {
+        history.replaceState({ competition: null }, "", "home.html");
+      }
+    }
+  }
+  document.getElementById("closeDetailBtn").addEventListener("click", () => closeDetail());
+
+  window.addEventListener("popstate", (e) => {
+    const state = e.state;
+    if (!state || !state.competition) {
+      if (activeDetailId) closeDetail({ fromPopstate: true });
+      return;
+    }
+    if (competitions.some(c => c.id === state.competition)) {
+      openDetail(state.competition, { fromPopstate: true, pushHistory: false });
+    }
   });
 
   // ---------- Registration modal (Apply now) ----------
