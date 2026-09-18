@@ -894,6 +894,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
         ${images.length > 1 ? `<span class="gallery-counter" id="galleryCounter">1 / ${images.length}</span>` : ""}
       </div>`;
   }
+  let galleryImages = [];
   let galleryTrackEl = null;
   let galleryAutoplayTimer = null;
   let galleryAutoplayPausedForLightbox = false;
