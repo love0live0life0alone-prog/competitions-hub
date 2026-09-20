@@ -578,6 +578,12 @@
       cropReset: "Reset to center",
       cropCancel: "Cancel",
       cropSave: "Save Crop",
+      btnExportCsv: "⬇️ Export CSV",
+      csvHeaders: ["Name", "Participation type", "Phone", "Email", "Supervisor", "Team members", "Notes", "WhatsApp group", "Follow-up status", "Registered at"],
+      csvTypeTeam: "Team",
+      csvTypeIndividual: "Individual",
+      offlineAction: "You're offline — this action needs an internet connection.",
+      publishFailed: "Couldn't publish the competition. Check your connection and try again.",
       dateLocale: "en-GB",
     },
     ar: {
@@ -680,6 +686,12 @@
       cropReset: "رجوع لنص الصورة",
       cropCancel: "إلغاء",
       cropSave: "حفظ الكروب",
+      btnExportCsv: "⬇️ تصدير CSV",
+      csvHeaders: ["الاسم", "نوع المشاركة", "الهاتف", "الإيميل", "المشرف", "أعضاء الفريق", "ملاحظات", "جروب الواتساب", "حالة المتابعة", "تاريخ التسجيل"],
+      csvTypeTeam: "فريق",
+      csvTypeIndividual: "فردي",
+      offlineAction: "أنت أوفلاين — العملية دي محتاجة اتصال بالإنترنت.",
+      publishFailed: "مقدرناش ننشر المسابقة. اتأكد من الاتصال وحاول تاني.",
       dateLocale: "ar-EG",
     }
   };
@@ -793,7 +805,7 @@
     }
 
     listenToCompetitions();
-    registerPushToken(user.uid);
+    registerPushToken(user.uid, profile);
   });
 
   // Tears down every open "Track Students" panel's realtime listener and
@@ -862,7 +874,8 @@
   document.getElementById("btnLangAr").addEventListener("click", () => applyLang("ar"));
   applyLang(currentLang);
 
-  async function registerPushToken(uid) {
+  async function registerPushToken(uid, profile) {
+    if (profile && profile.notificationsEnabled === false) return; // turned off from the student view
     try {
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
       const permission = await Notification.requestPermission();
@@ -1218,13 +1231,78 @@
       }).join("");
     }
 
+    if (rows.length > 0) {
+      html = `<div style="margin-top:10px;"><button type="button" class="btn small secondary" data-export="${competitionId}">${t("btnExportCsv")}</button></div>` + html;
+    }
     panel.innerHTML = html;
+    const exportBtn = panel.querySelector("[data-export]");
+    if (exportBtn) exportBtn.addEventListener("click", () => exportStudentsCsv(competitionId));
     panel.querySelectorAll(".follow-select").forEach(sel => {
       sel.addEventListener("change", async () => {
         const docId = `${sel.dataset.comp}_${sel.dataset.student}`;
         await updateDoc(doc(db, "competition_interactions", docId), { followUpStatus: sel.value });
       });
     });
+  }
+
+  // ---------- CSV export (Track Students panel) ----------
+  // Uses the rows the panel has ALREADY loaded (panelRowsCache) — no extra reads, no new API.
+  // Cell escaping also neutralises spreadsheet-formula injection: every value here was typed
+  // by a student, and a cell starting with = + - @ would otherwise run as a formula in Excel.
+  // Phone numbers made only of digits get the ="0101…" form so Excel keeps the leading zero.
+  function csvCell(value, isPhone = false) {
+    let s = value === null || value === undefined ? "" : String(value);
+    const trimmed = s.trim();
+    if (isPhone && /^\+?[\d\s]+$/.test(trimmed) && /\d/.test(trimmed)) {
+      s = `="${trimmed}"`;
+    } else if (/^[=+\-@\t\r]/.test(s)) {
+      s = "'" + s;
+    }
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+
+  function exportStudentsCsv(competitionId) {
+    const rows = panelRowsCache[competitionId];
+    if (!rows || rows.length === 0) return;
+    const comp = competitions.find(c => c.id === competitionId);
+    const followLabel = {
+      registered: t("followRegistered"), in_progress: t("followInProgress"),
+      completed: t("followCompleted"), dropped: t("followDropped"),
+    };
+    const typeLabel = (v) => v === "team" ? t("csvTypeTeam") : v === "individual" ? t("csvTypeIndividual") : "";
+    const pad = (n) => String(n).padStart(2, "0");
+    const fmtDate = (d) => d
+      ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+      : "";
+
+    const lines = [t("csvHeaders").map(h => csvCell(h)).join(",")];
+    rows.forEach(r => {
+      const members = (r.teamMembers || []).map(m => `${m.name} (${m.phone})`).join("; ");
+      lines.push([
+        csvCell(r.name),
+        csvCell(typeLabel(r.participationType)),
+        csvCell(r.leaderPhone, true),
+        csvCell(r.leaderEmail),
+        csvCell(r.supervisorName),
+        csvCell(members),
+        csvCell(r.notes),
+        csvCell(r.whatsappJoined ? t("waJoined") : t("waNotJoined")),
+        csvCell(followLabel[r.followUpStatus] || r.followUpStatus),
+        csvCell(fmtDate(r.submittedAt)),
+      ].join(","));
+    });
+
+    // "\uFEFF" = UTF-8 BOM, so Excel opens Arabic text correctly.
+    const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const safeTitle = ((comp && comp.title) || "competition").replace(/[\\/:*?"<>|\r\n]+/g, " ").trim().slice(0, 60);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safeTitle} - registrations.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   // Patches just the "completed" number on one competition's card — the one
@@ -1259,6 +1337,7 @@
         teamMembers: d.teamMembers || [],
         notes: d.notes || null,
         whatsappJoined: !!d.whatsappJoinedAt,
+        submittedAt: d.formSubmittedAt && d.formSubmittedAt.toDate ? d.formSubmittedAt.toDate() : null,
       };
     }));
   }
@@ -1519,6 +1598,7 @@
       document.getElementById("compModalScrim").classList.remove("show");
       return;
     }
+    if (!navigator.onLine) { alert(t("offlineAction")); return; }
     const payload = {
       title: document.getElementById("fTitle").value.trim(),
       description: document.getElementById("fDesc").value.trim(),
@@ -1538,7 +1618,8 @@
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
       body: JSON.stringify(payload)
     });
-    const result = await res.json();
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok || !result.id) { alert(t("publishFailed")); return; }
 
     // Now that the competition has an id, photos can be attached — keep
     // the modal open in "manage photos" mode instead of closing it.

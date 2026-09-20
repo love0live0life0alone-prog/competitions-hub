@@ -401,6 +401,62 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   }
   .cta-whatsapp svg{ width:19px; height:19px; fill:#fff; flex:none; }
 
+  /* ---------- What's new (unread) ---------- */
+  .badge.new{ background:var(--gold-soft); color:#8A5A12; }
+  .whatsnew-banner{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--gold-soft); border:1px solid rgba(217,164,65,0.55); color:#6B4A10;
+    border-radius:12px; padding:10px 14px; font-size:13px; font-weight:600;
+  }
+  .whatsnew-banner button{
+    flex:none; border:none; background:var(--navy-900); color:#fff; border-radius:8px;
+    padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .offline-note{
+    font-size:12px; color:var(--ink-soft); background:var(--paper); border:1px solid var(--line);
+    border-radius:9px; padding:8px 12px; margin-bottom:12px; line-height:1.6;
+  }
+
+  /* ---------- My registrations ---------- */
+  #regsOverlay{ overscroll-behavior-y:contain; }
+  .reg-state{ color:var(--ink-soft); font-size:13.5px; text-align:center; padding:30px 10px; }
+  .reg-item{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 16px; margin-bottom:12px; cursor:pointer;
+  }
+  .reg-item h3{ font-family:'Space Grotesk',sans-serif; font-size:15.5px; margin:8px 0 6px; line-height:1.4; }
+  html[dir="rtl"] .reg-item h3{ font-family:'Tajawal',sans-serif; font-weight:700; }
+  .reg-meta{ display:flex; flex-wrap:wrap; gap:6px 12px; font-size:12.5px; color:var(--ink-soft); }
+  .reg-result{
+    margin-top:10px; padding:9px 12px; border-radius:10px; font-size:13px; font-weight:600;
+    background:var(--paper); color:var(--ink-soft);
+  }
+  .reg-result.pending{ background:var(--teal-soft); color:var(--teal); }
+  .reg-result.won{
+    background:linear-gradient(135deg, rgba(217,164,65,0.16), rgba(217,164,65,0.04));
+    border:1px solid rgba(217,164,65,0.4); color:var(--navy-900);
+  }
+
+  /* ---------- Notification switch (sidebar) ---------- */
+  .toggle-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13.5px; cursor:pointer; }
+  .switch{
+    appearance:none; -webkit-appearance:none; flex:none; width:44px; height:26px; border-radius:999px;
+    background:rgba(255,255,255,0.22); position:relative; cursor:pointer; transition:background .18s ease; margin:0;
+  }
+  .switch::after{
+    content:""; position:absolute; top:3px; inset-inline-start:3px; width:20px; height:20px; border-radius:50%;
+    background:#fff; transition:transform .18s ease;
+  }
+  .switch:checked{ background:var(--teal); }
+  .switch:checked::after{ transform:translateX(18px); }
+  html[dir="rtl"] .switch:checked::after{ transform:translateX(-18px); }
+  .switch:disabled{ opacity:.55; cursor:not-allowed; }
+  .notif-hint{ font-size:11.5px; color:rgba(255,255,255,0.6); margin:8px 0 0; line-height:1.6; }
+  .notif-hint:empty{ display:none; }
+  @media (prefers-reduced-motion: reduce){
+    .switch, .switch::after{ transition-duration:0.01ms !important; }
+  }
+
   /* ---------- Auth gate splash (prevents login/content flash) ---------- */
   .auth-gate{
     position:fixed; inset:0; z-index:999;
@@ -471,6 +527,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       </div>
     </div>
 
+    <button class="save-btn" id="myRegsBtn" type="button" style="margin:14px 0 0;"><span id="myRegsBtnLabel">📋 تسجيلاتي</span> <span id="myRegsCount"></span></button>
+
     <a href="admin.html" class="admin-link" id="adminLink" style="display:none;">
       <span id="lblAdminLink">لوحة تحكم المسؤولين</span>
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
@@ -518,6 +576,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       <button class="save-btn" id="forceUpdateBtn" style="background:transparent;border:1px solid rgba(255,255,255,0.25);color:#fff;">🔄 تحديث فوري (مسح الكاش)</button>
     </div>
 
+    <div class="side-section">
+      <p class="side-label" id="lblNotif">الإشعارات</p>
+      <label class="toggle-row">
+        <span id="lblNotifToggle">استقبال إشعارات التطبيق</span>
+        <input type="checkbox" class="switch" id="notifToggle" checked>
+      </label>
+      <p class="notif-hint" id="notifHint"></p>
+    </div>
+
     <div class="side-section" id="contactSection">
       <p class="side-label" id="lblContact">تواصل معنا — رعاية الشباب</p>
       <div id="contactList"></div>
@@ -525,6 +592,17 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
 
     <button class="logout-btn" id="logoutBtn">تسجيل الخروج</button>
   </aside>
+
+  <!-- ---------- My registrations overlay ---------- -->
+  <div class="detail-overlay" id="regsOverlay">
+    <div class="detail-head">
+      <button class="icon-btn" id="closeRegsBtn" aria-label="close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <h1 id="regsHeadTitle" style="font-size:15px;">تسجيلاتي</h1>
+    </div>
+    <div class="detail-body" id="regsBody"><!-- injected --></div>
+  </div>
 
   <!-- ---------- Competition detail overlay ---------- -->
   <div class="detail-overlay" id="detailOverlay">
@@ -599,10 +677,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+  import { getMessaging, getToken, deleteToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
   import {
     initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-    doc, getDoc, setDoc, collection, query, orderBy, onSnapshot, getDocs
+    doc, getDoc, setDoc, collection, query, orderBy, onSnapshot, getDocs, where, deleteField
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   // TODO: same config as index.html
@@ -657,6 +735,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   let current = localStorage.getItem("uch_lang") === "ar" ? "ar" : "en";
   let currentDetailId = null;
   let regParticipationType = "individual";
+
+  // ---------- My registrations / What's new state ----------
+  let competitionsLoaded = false;        // true after the first competitions snapshot (or its error)
+  let myRegistrations = [];              // this student's submitted registrations (competition_interactions)
+  let myRegistrationsState = "loading";  // "loading" | "ready" | "error"
+  let unsubscribeMyRegistrations = null;
+  let newSinceMs = null;                 // "what's new" baseline for this visit (null = not established yet)
+  let lastSeenWrittenMs = 0;             // last value saved to users/{uid}.lastSeenCompetitionMs
+  const seenThisSession = new Set();     // competition ids the student already opened this visit
   // بيحفظ id المسابقة اللي التفاصيل بتاعتها متفتحة دلوقتي، مستخدم بس عشان زرار الرجوع
   let activeDetailId = null;
 
@@ -739,6 +826,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       console.error("profile load error:", e);
     }
     renderProfile();
+    initWhatsNewBaseline();
+    listenToMyRegistrations();
     listenToCompetitions();
     registerPushToken();
     openFromUrlIfNeeded();
@@ -764,12 +853,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   async function registerPushToken() {
     try {
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+      if (userProfile && userProfile.notificationsEnabled === false) return; // student opted out
       const permission = await Notification.requestPermission();
       if (permission !== "granted") return;
       const reg = await navigator.serviceWorker.ready;
       const messaging = getMessaging(app);
       const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
-      if (token) await setDoc(doc(db, "users", currentUser.uid), { fcmToken: token }, { merge: true });
+      if (token && !(userProfile && userProfile.notificationsEnabled === false)) {
+        await setDoc(doc(db, "users", currentUser.uid), { fcmToken: token }, { merge: true });
+      }
     } catch (e) {
       console.error("push token error:", e);
     }
@@ -783,9 +875,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       return;
     }
     history.replaceState({ competition: null }, "", "home.html");
+    let attempts = 0;
     const tryOpen = () => {
       if (competitions.some(c => c.id === targetId)) openDetail(targetId);
-      else setTimeout(tryOpen, 300);
+      else if (attempts++ < 40) setTimeout(tryOpen, 300); // ~12s, then give up
     };
     tryOpen();
   }
@@ -807,6 +900,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
     if (userProfile.academicYear) document.getElementById("editYear").value = userProfile.academicYear;
 
     document.getElementById("adminLink").style.display = userProfile.role === "admin" ? "flex" : "none";
+    renderNotifToggle();
   }
 
   // ---------- Save profile edits ----------
@@ -847,6 +941,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       // Competitions soft-deleted by an admin stay in Firestore (with all
       // their data) but must never show up in the student feed.
       competitions = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.deleted);
+      competitionsLoaded = true;
+      establishWhatsNewBaseline();
+      renderMyRegistrations();
       // snap.metadata.fromCache is true when this data came from Firestore's
       // persistent local cache rather than a live server response — i.e. we
       // are currently offline (or briefly reconnecting) and showing the last
@@ -856,6 +953,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       // A listener error should never wipe an already-rendered feed —
       // whatever was last rendered (from cache or server) stays on screen.
       console.error("competitions listener error:", err);
+      competitionsLoaded = true;
+      renderMyRegistrations();
     });
   }
 
@@ -876,13 +975,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
     }
 
     if (list.length === 0) {
-      feed.innerHTML = `<div class="empty-state">
+      feed.innerHTML = renderWhatsNewBanner() + `<div class="empty-state">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
         <p>${strings[current].empty}</p></div>`;
       return;
     }
 
-    feed.innerHTML = list.map(c => {
+    feed.innerHTML = renderWhatsNewBanner() + list.map(c => {
       const appDl = c.applicationDeadline || c.deadline;
       const urgent = c.status === "open" && isUrgent(appDl);
       return `
@@ -890,7 +989,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
         <div class="card-top">
           <span class="badge ${c.status}">${c.status === "open" ? strings[current].open : strings[current].closed}</span>
         </div>
-        <h3>${escapeHtml(c.title)}</h3>
+        <h3>${isNewCompetition(c) ? `<span class="badge new" style="margin-inline-end:8px;vertical-align:middle;">${strings[current].newBadge}</span>` : ""}${escapeHtml(c.title)}</h3>
         <p>${escapeHtml(c.description || "")}</p>
         <div class="card-meta ${urgent ? "urgent" : ""}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
@@ -915,6 +1014,231 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
     const d = new Date(iso);
     return d.toLocaleDateString(current === "ar" ? "ar-EG" : "en-GB", { day: "numeric", month: "short" });
   }
+
+  // ======================================================================
+  // My registrations · Notification preference · What's new / unread
+  // ======================================================================
+
+  // ---------- What's new / unread ----------
+  // One number per student: users/{uid}.lastSeenCompetitionMs = the createdAt (ms) of the newest
+  // competition they had on screen when they last left the app. It is derived from the
+  // competitions' own server timestamps, so device clock skew can never matter.
+  function createdMs(c) {
+    return c.createdAt && typeof c.createdAt.toMillis === "function" ? c.createdAt.toMillis() : 0;
+  }
+  function latestCreatedMs(list) {
+    return list.reduce((max, c) => Math.max(max, createdMs(c)), 0);
+  }
+  function initWhatsNewBaseline() {
+    const stored = userProfile && userProfile.lastSeenCompetitionMs;
+    if (typeof stored === "number" && stored > 0) {
+      newSinceMs = stored;
+      lastSeenWrittenMs = stored;
+    }
+  }
+  // First visit ever (nothing stored yet): everything that exists now counts as seen,
+  // only competitions published from now on are "new".
+  function establishWhatsNewBaseline() {
+    if (newSinceMs !== null) return;
+    const latest = latestCreatedMs(competitions);
+    if (!latest) return;
+    newSinceMs = latest;
+    persistLastSeen();
+  }
+  function isNewCompetition(c) {
+    if (newSinceMs === null || seenThisSession.has(c.id)) return false;
+    return createdMs(c) > newSinceMs;
+  }
+  function persistLastSeen() {
+    if (!currentUser || !userProfile) return; // never overwrite a stored value we haven't read
+    const latest = latestCreatedMs(competitions);
+    if (!latest || latest <= lastSeenWrittenMs) return;
+    lastSeenWrittenMs = latest;
+    userProfile = { ...userProfile, lastSeenCompetitionMs: latest };
+    // Fire-and-forget: with Firestore's persistent cache the write is queued locally
+    // and synced later if the device happens to be offline right now.
+    setDoc(doc(db, "users", currentUser.uid), { lastSeenCompetitionMs: latest }, { merge: true })
+      .catch((e) => console.warn("last-seen save failed:", e));
+  }
+  function renderWhatsNewBanner() {
+    const count = competitions.filter(isNewCompetition).length;
+    if (!count) return "";
+    return `<div class="whatsnew-banner" role="status">
+      <span>🆕 ${strings[current].newBanner(count)}</span>
+      <button type="button" id="markNewReadBtn">${strings[current].markRead}</button>
+    </div>`;
+  }
+  function markAllNewAsRead() {
+    const latest = latestCreatedMs(competitions);
+    if (latest) newSinceMs = Math.max(newSinceMs || 0, latest);
+    persistLastSeen();
+    renderFeed();
+  }
+  document.getElementById("feed").addEventListener("click", (e) => {
+    if (e.target.closest("#markNewReadBtn")) markAllNewAsRead();
+  });
+  // "Visit" = one foreground period: save when the student leaves, and when they come
+  // back start a fresh comparison from that saved point.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      persistLastSeen();
+    } else if (newSinceMs !== null && lastSeenWrittenMs > newSinceMs) {
+      newSinceMs = lastSeenWrittenMs;
+      renderFeed();
+    }
+  });
+  window.addEventListener("pagehide", persistLastSeen);
+
+  // ---------- My registrations ----------
+  // Realtime query on the student's OWN interaction docs (rules only allow
+  // studentId == auth.uid). It reuses the persistent Firestore cache, so it also works offline.
+  function listenToMyRegistrations() {
+    if (unsubscribeMyRegistrations || !currentUser) return;
+    const q = query(collection(db, "competition_interactions"), where("studentId", "==", currentUser.uid));
+    unsubscribeMyRegistrations = onSnapshot(q, (snap) => {
+      myRegistrations = snap.docs.map(d => d.data()).filter(d => d.formSubmittedAt); // submitted only ("view"/"click" docs excluded)
+      myRegistrationsState = "ready";
+      renderMyRegistrations();
+    }, (err) => {
+      console.error("my registrations listener error:", err);
+      if (myRegistrationsState === "loading") myRegistrationsState = "error"; // keep old data if we already had some
+      renderMyRegistrations();
+    });
+  }
+
+  function regSubmittedMs(r) {
+    return r.formSubmittedAt && typeof r.formSubmittedAt.toMillis === "function" ? r.formSubmittedAt.toMillis() : 0;
+  }
+  function formatRegDate(ts) {
+    const d = ts && typeof ts.toDate === "function" ? ts.toDate() : null;
+    if (!d) return "—";
+    return d.toLocaleDateString(current === "ar" ? "ar-EG" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  function renderMyRegistrations() {
+    const s = strings[current];
+    const countEl = document.getElementById("myRegsCount");
+    const body = document.getElementById("regsBody");
+    if (countEl) {
+      countEl.textContent = (myRegistrationsState === "ready" && myRegistrations.length) ? `(${myRegistrations.length})` : "";
+    }
+    if (!body) return;
+
+    const offlineNote = navigator.onLine ? "" : `<div class="offline-note">${s.regsOfflineNote}</div>`;
+
+    if (myRegistrationsState === "loading" || !competitionsLoaded) {
+      body.innerHTML = offlineNote + `<p class="reg-state">${s.regsLoading}</p>`;
+      return;
+    }
+    if (myRegistrationsState === "error") {
+      body.innerHTML = offlineNote + `<p class="reg-state">${s.regsError}</p>`;
+      return;
+    }
+
+    const rows = myRegistrations
+      .map(r => ({ r, c: competitions.find(x => x.id === r.competitionId) }))
+      .filter(x => x.c) // competition was deleted by an admin → not shown
+      .sort((a, b) => regSubmittedMs(b.r) - regSubmittedMs(a.r));
+
+    if (rows.length === 0) {
+      body.innerHTML = offlineNote + `<div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <p>${s.regsEmpty}</p></div>`;
+      return;
+    }
+
+    body.innerHTML = offlineNote + rows.map(({ r, c }) => {
+      const typeLabel = r.participationType === "team" ? s.typeTeam : r.participationType === "individual" ? s.typeIndividual : "";
+      const isClosed = c.status === "closed";
+      const winner = (isClosed && currentUser && Array.isArray(c.winners))
+        ? c.winners.find(w => w.studentId === currentUser.uid) : null;
+      const rank = winner ? winner.rank : (isClosed && r.finalResult === "won" ? r.rank : null);
+      const resultHtml = rank
+        ? `<div class="reg-result won">${s.regsRank(rank)}</div>`
+        : isClosed
+          ? `<div class="reg-result">${s.regsEnded}</div>`
+          : `<div class="reg-result pending">${s.regsAwaiting}</div>`;
+      return `
+        <article class="reg-item" data-id="${escapeHtml(c.id)}">
+          <span class="badge ${isClosed ? "closed" : "open"}">${isClosed ? s.closed : s.open}</span>
+          <h3>${escapeHtml(c.title)}</h3>
+          <div class="reg-meta">
+            ${typeLabel ? `<span>${typeLabel}</span>` : ""}
+            <span>${s.regsDatePrefix} ${formatRegDate(r.formSubmittedAt)}</span>
+          </div>
+          ${resultHtml}
+        </article>`;
+    }).join("");
+
+    body.querySelectorAll(".reg-item").forEach(el =>
+      el.addEventListener("click", () => openDetail(el.dataset.id)));
+  }
+
+  function openRegsOverlay() {
+    closeSidebar();
+    renderMyRegistrations();
+    document.getElementById("regsOverlay").classList.add("open");
+  }
+  function closeRegsOverlay() {
+    document.getElementById("regsOverlay").classList.remove("open");
+  }
+  document.getElementById("myRegsBtn").addEventListener("click", openRegsOverlay);
+  document.getElementById("closeRegsBtn").addEventListener("click", closeRegsOverlay);
+  window.addEventListener("online", renderMyRegistrations);
+  window.addEventListener("offline", renderMyRegistrations);
+
+  // ---------- Notification preference ----------
+  // users/{uid}.notificationsEnabled (missing == enabled). Turning it off also removes the
+  // stored FCM token, and Railway skips users whose flag is false, so both sides agree.
+  function setNotifHint(key) {
+    document.getElementById("notifHint").textContent = key ? strings[current][key] : "";
+  }
+  function renderNotifToggle() {
+    const toggle = document.getElementById("notifToggle");
+    if (!toggle) return;
+    toggle.checked = !userProfile || userProfile.notificationsEnabled !== false;
+    const blocked = "Notification" in window && Notification.permission === "denied";
+    setNotifHint(toggle.checked && blocked ? "notifHintBlocked" : "");
+  }
+
+  document.getElementById("notifToggle").addEventListener("change", async (e) => {
+    const toggle = e.target;
+    const wantEnabled = toggle.checked;
+    const revert = (hintKey) => { toggle.checked = !wantEnabled; setNotifHint(hintKey); };
+
+    if (!currentUser) { revert(""); return; }
+    if (!navigator.onLine) { revert("notifHintOffline"); return; }
+
+    toggle.disabled = true;
+    setNotifHint("");
+    try {
+      if (wantEnabled) {
+        if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+          revert("notifHintUnsupported");
+          return;
+        }
+        const permission = Notification.permission === "default"
+          ? await Notification.requestPermission()
+          : Notification.permission;
+        if (permission !== "granted") { revert("notifHintBlocked"); return; }
+        const reg = await navigator.serviceWorker.ready;
+        const token = await getToken(getMessaging(app), { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+        if (!token) throw new Error("no FCM token");
+        await setDoc(doc(db, "users", currentUser.uid), { notificationsEnabled: true, fcmToken: token }, { merge: true });
+        userProfile = { ...userProfile, notificationsEnabled: true, fcmToken: token };
+      } else {
+        await setDoc(doc(db, "users", currentUser.uid), { notificationsEnabled: false, fcmToken: deleteField() }, { merge: true });
+        const { fcmToken, ...rest } = userProfile || {};
+        userProfile = { ...rest, notificationsEnabled: false };
+        try { await deleteToken(getMessaging(app)); } catch (err) { console.warn("deleteToken failed:", err); }
+      }
+    } catch (err) {
+      console.error("notification toggle error:", err);
+      revert("notifHintError");
+    } finally {
+      toggle.disabled = false;
+    }
+  });
 
   // ---------- Filter chips ----------
   document.getElementById("filters").addEventListener("click", (e) => {
@@ -1148,7 +1472,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       try {
         const regSnap = await getDoc(doc(db, "competition_interactions", `${id}_${currentUser.uid}`));
         isRegistered = regSnap.exists() && !!regSnap.data().formSubmittedAt;
-      } catch (e) { /* treat as not registered yet */ }
+      } catch (e) {
+        // Offline or not cached — fall back to the student's own (cached) registrations list.
+        isRegistered = myRegistrations.some(r => r.competitionId === id);
+      }
     }
 
     const ctaHtml = c.status === "open" ? renderApplyCta(c, isRegistered, applicationOpen) : "";
@@ -1190,6 +1517,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
 
     document.getElementById("detailOverlay").classList.add("open");
     activeDetailId = id;
+    if (isNewCompetition(c)) { seenThisSession.add(id); renderFeed(); }
 
     if (pushHistory && !fromPopstate) {
       const url = `home.html?competition=${id}`;
@@ -1295,6 +1623,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
         const phone = row.querySelector(".member-phone").value.trim();
         if (name && phone) teamMembers.push({ name, phone });
       });
+    }
+
+    if (!navigator.onLine) {
+      errEl.textContent = strings[current].regOfflineError;
+      errEl.classList.add("show");
+      return;
     }
 
     const submitBtn = document.getElementById("regSubmitBtn");
@@ -1407,7 +1741,27 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       joinWhatsapp:"انضم لجروب المسابقة على واتساب",
       externalLinkLabel:"رابط/فورم التقديم الرسمي",
       updateAvailable:"في نسخة جديدة من التطبيق",
-      updateNow:"تحديث"
+      updateNow:"تحديث",
+      newBadge:"جديد",
+      newBanner:(n) => n === 1 ? "مسابقة جديدة من آخر زيارة ليك" : n <= 10 ? `${n} مسابقات جديدة من آخر زيارة ليك` : `${n} مسابقة جديدة من آخر زيارة ليك`,
+      markRead:"تمت القراءة",
+      regsMenu:"📋 تسجيلاتي",
+      regsTitle:"تسجيلاتي",
+      regsLoading:"جارِ تحميل تسجيلاتك...",
+      regsEmpty:"لسه مسجلتش في أي مسابقة — افتح أي مسابقة واضغط على زر التقديم.",
+      regsError:"مقدرناش نحمّل تسجيلاتك دلوقتي — حاول تاني بعد شوية.",
+      regsOfflineNote:"أنت أوفلاين — بنعرض آخر بيانات محفوظة على جهازك.",
+      regsDatePrefix:"تاريخ التسجيل:",
+      regsAwaiting:"تم التسجيل — في انتظار النتيجة",
+      regsEnded:"المسابقة انتهت — شكرًا لمشاركتك",
+      regsRank:(n) => `حصلت على المركز ${n} 🏆`,
+      notifSection:"الإشعارات",
+      notifToggleLabel:"استقبال إشعارات التطبيق",
+      notifHintBlocked:"الإشعارات محجوبة من إعدادات المتصفح — اسمح بيها من هناك الأول.",
+      notifHintOffline:"لازم تكون متصل بالإنترنت عشان تغيّر إعدادات الإشعارات.",
+      notifHintUnsupported:"المتصفح ده مش بيدعم الإشعارات.",
+      notifHintError:"حصل خطأ — حاول تاني.",
+      regOfflineError:"لازم تكون متصل بالإنترنت عشان تسجّل في المسابقة."
     },
     en: {
       dir:"ltr", lang:"en", pageTitle:"Competition Announcements",
@@ -1439,7 +1793,27 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       joinWhatsapp:"Join the competition WhatsApp group",
       externalLinkLabel:"Official application link/form",
       updateAvailable:"A new version is available",
-      updateNow:"Update"
+      updateNow:"Update",
+      newBadge:"New",
+      newBanner:(n) => n === 1 ? "1 new competition since your last visit" : `${n} new competitions since your last visit`,
+      markRead:"Mark as read",
+      regsMenu:"📋 My registrations",
+      regsTitle:"My registrations",
+      regsLoading:"Loading your registrations...",
+      regsEmpty:"You haven't registered for any competition yet — open one and tap Apply.",
+      regsError:"Couldn't load your registrations right now — please try again shortly.",
+      regsOfflineNote:"You're offline — showing the data last saved on this device.",
+      regsDatePrefix:"Registered on:",
+      regsAwaiting:"Registered — awaiting results",
+      regsEnded:"Competition ended — thanks for taking part",
+      regsRank:(n) => `You placed #${n} 🏆`,
+      notifSection:"Notifications",
+      notifToggleLabel:"Push notifications",
+      notifHintBlocked:"Notifications are blocked in your browser settings — allow them there first.",
+      notifHintOffline:"You need to be online to change notification settings.",
+      notifHintUnsupported:"This browser doesn't support push notifications.",
+      notifHintError:"Something went wrong — please try again.",
+      regOfflineError:"You need to be online to register for a competition."
     }
   };
 
@@ -1488,6 +1862,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       row.querySelector(".member-name").placeholder = s.memberName;
       row.querySelector(".member-phone").placeholder = s.memberPhone;
     });
+
+    document.getElementById("myRegsBtnLabel").textContent = s.regsMenu;
+    document.getElementById("regsHeadTitle").textContent = s.regsTitle;
+    document.getElementById("lblNotif").textContent = s.notifSection;
+    document.getElementById("lblNotifToggle").textContent = s.notifToggleLabel;
+    renderNotifToggle();
+    renderMyRegistrations();
 
     localStorage.setItem("uch_lang", code);
     renderProfile();

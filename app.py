@@ -318,6 +318,8 @@ def get_all_recipient_tokens(exclude_registered_for=None):
         ud = u.to_dict()
         if ud.get("role") == "student" and u.id in submitted_ids:
             continue
+        if ud.get("notificationsEnabled") is False:
+            continue  # user switched push notifications off in the app (missing field == enabled)
         token = ud.get("fcmToken")
         if token:
             tokens.append(token)

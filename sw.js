@@ -6,8 +6,8 @@
 // - Basic Background Sync queue for offline interactions
 // ============================================================
 
-const APP_SHELL_CACHE = "uch-shell-v6";
-const DATA_CACHE = "uch-data-v6";
+const APP_SHELL_CACHE = "uch-shell-v7";
+const DATA_CACHE = "uch-data-v7";
 
 const APP_SHELL_FILES = [
   "./",
@@ -20,7 +20,11 @@ const APP_SHELL_FILES = [
 // ---------- Install: pre-cache the app shell ----------
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(APP_SHELL_CACHE).then((cache) => cache.addAll(APP_SHELL_FILES))
+    caches.open(APP_SHELL_CACHE).then((cache) =>
+      // cache:"reload" skips the browser HTTP cache, so a freshly installed worker
+      // never precaches a stale (up to 10 min old on GitHub Pages) copy of the pages.
+      Promise.all(APP_SHELL_FILES.map((file) => cache.add(new Request(file, { cache: "reload" }))))
+    )
   );
   // Do NOT auto skipWaiting anymore — a new SW now waits until the page
   // explicitly asks it to activate (see the "message" listener below), so
@@ -53,6 +57,12 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Firestore / Auth / Installations / FCM-registration traffic (…googleapis.com) must go
+  // straight to the network: Firestore has its own IndexedDB offline cache and its
+  // streaming channel requests must never be cloned into the Cache API.
+  // (fonts.googleapis.com is still handled below so fonts keep working offline.)
+  if (url.hostname.endsWith(".googleapis.com") && url.hostname !== "fonts.googleapis.com") return;
+
   // Treat calls to your Flask API (Railway) as "data" requests.
   const isApiCall = url.pathname.startsWith("/api/");
 
@@ -73,22 +83,41 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // App shell: cache-first, refresh cache in the background.
+  // Everything below is the app shell / static assets: plain GET requests only.
+  if (request.method !== "GET") return;
+
+  const isNavigation = request.mode === "navigate";
+
+  // Keeps the worker alive until the background refresh below has finished, so a
+  // cached page is served instantly AND the cache is still updated with the latest copy.
+  let finishRefresh;
+  event.waitUntil(new Promise((resolve) => { finishRefresh = resolve; }));
+
+  // Stale-while-revalidate: cached copy first, network refresh in the background.
+  // Navigations ignore the query string, so deep links / reloads such as
+  // "home.html?competition=ID" still resolve to the cached home.html when offline.
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((response) => {
-          // الكاش الوسيط بيدعم بس طلبات GET على http/https — أي حاجة تانية
-          // (POST، أو طلبات إضافات كروم زي chrome-extension://) لازم تتجاهل
-          // هنا عشان متعملش reject/uncaught error، مع إنها مش مشكلة حقيقية.
-          if (request.method === "GET" && request.url.startsWith("http")) {
-            const clone = response.clone();
-            caches.open(APP_SHELL_CACHE).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
+    caches.match(request, { ignoreSearch: isNavigation }).then((cached) => {
+      const network = fetch(request).then((response) => {
+        // Only store usable responses (or opaque cross-origin ones such as images/scripts):
+        // a 404/500 must never overwrite a good cached copy. Pages are stored without
+        // their query string so there is one cached copy per page.
+        if (request.url.startsWith("http") && response && (response.ok || response.type === "opaque")) {
+          const clone = response.clone();
+          const cacheKey = isNavigation ? url.origin + url.pathname : request;
+          caches.open(APP_SHELL_CACHE).then((cache) => cache.put(cacheKey, clone));
+        }
+        return response;
+      });
+      network.then(finishRefresh, finishRefresh);
+
+      if (cached) return cached;
+
+      // Nothing cached: use the network; if that fails (offline) fall back to the cached
+      // app shell for page navigations instead of showing a browser error page.
+      return network
+        .catch(() => (isNavigation ? caches.match("./home.html") : undefined))
+        .then((res) => res || Response.error());
     })
   );
 });
@@ -133,7 +162,12 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetId = event.notification.data && event.notification.data.competitionId;
-  const targetUrl = targetId ? `/home.html?competition=${targetId}` : "/home.html";
+  // Resolved against the SW scope (not the origin root) so it also works when the app
+  // is hosted under a sub-path such as https://<user>.github.io/competitions-hub/
+  const targetUrl = new URL(
+    targetId ? `./home.html?competition=${encodeURIComponent(targetId)}` : "./home.html",
+    self.registration.scope
+  ).href;
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientsArr) => {
