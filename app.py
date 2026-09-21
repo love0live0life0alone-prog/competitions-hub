@@ -17,6 +17,8 @@ Requires environment variables (set these in Railway, never commit them):
 
 import os
 import json
+import re
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from flask import Flask, request, jsonify
@@ -25,6 +27,7 @@ import firebase_admin
 from firebase_admin import credentials, auth, firestore, messaging
 import cloudinary
 import cloudinary.uploader
+import cloudinary.utils
 
 app = Flask(__name__)
 CORS(app)
@@ -54,6 +57,8 @@ def verify_request_user():
     token = header.split(" ", 1)[1]
     try:
         decoded = auth.verify_id_token(token)
+        if not decoded.get("email_verified"):
+            return None
         email = decoded.get("email", "").lower()
         if ALLOWED_DOMAIN and not email.endswith("@" + ALLOWED_DOMAIN.lower()):
             return None
@@ -74,6 +79,40 @@ def health():
     return jsonify({"status": "ok"})
 
 
+# ---------- Competition attachments (PDF / Word files) ----------
+# competitions/{id}.attachments is a list of
+#   {"url": "https://res.cloudinary.com/<your cloud>/…", "name": "file.pdf",
+#    "publicId": "…", "resourceType": "image" | "raw"}
+# Files are uploaded by the admin's browser straight to Cloudinary (with a signature from
+# /api/uploads/sign below); the server only validates and stores the resulting links.
+MAX_ATTACHMENTS = 10
+
+
+def sanitize_attachments(raw):
+    """Keep only well-formed entries that point at THIS Cloudinary account, at most MAX_ATTACHMENTS."""
+    if not isinstance(raw, list):
+        return []
+    prefix = f"https://res.cloudinary.com/{cloudinary.config().cloud_name}/"
+    cleaned = []
+    for item in raw[:MAX_ATTACHMENTS]:
+        if not isinstance(item, dict):
+            continue
+        url = item.get("url")
+        if not isinstance(url, str) or not url.startswith(prefix) or len(url) > 2000:
+            continue
+        name = item.get("name")
+        entry = {
+            "url": url,
+            "name": name.strip()[:200] if isinstance(name, str) and name.strip() else "file",
+        }
+        public_id = item.get("publicId")
+        if isinstance(public_id, str) and 0 < len(public_id) <= 300 and item.get("resourceType") in ("image", "raw"):
+            entry["publicId"] = public_id          # lets us delete the asset later
+            entry["resourceType"] = item["resourceType"]
+        cleaned.append(entry)
+    return cleaned
+
+
 # ---------- Create / publish a competition (admin only) ----------
 @app.route("/api/competitions", methods=["POST"])
 def create_competition():
@@ -84,13 +123,15 @@ def create_competition():
         return jsonify({"error": "forbidden"}), 403
 
     data = request.get_json()
+    attachments = sanitize_attachments(data.get("attachments"))
     competition_ref = db.collection("competitions").document()
     competition_ref.set({
         "title": data["title"],
         "description": data["description"],
         "link": data["link"],
-        "attachmentUrl": data.get("attachmentUrl"),
-        "attachmentName": data.get("attachmentName"),
+        "attachments": attachments,
+        "attachmentUrl": attachments[0]["url"] if attachments else None,
+        "attachmentName": attachments[0]["name"] if attachments else None,
         "whatsappGroupLink": data.get("whatsappGroupLink"),
         # "deadline" is the overall competition deadline (e.g. results/event
         # date). "applicationDeadline" is when registration/applying closes —
@@ -253,7 +294,7 @@ def log_interaction():
 
         leader_name = _clean_str(registration.get("leaderName"))
         leader_phone = _clean_str(registration.get("leaderPhone"))
-        leader_email = _clean_str(registration.get("leaderEmail"))
+        leader_email = decoded.get("email", "").lower()
         if not leader_name or not leader_phone or not leader_email:
             return jsonify({"error": "missing required registration fields"}), 400
 
@@ -409,6 +450,46 @@ def close_competition(competition_id):
     return jsonify({"ok": True})
 
 
+# ---------- Signed Cloudinary uploads (admin only) ----------
+# The browser uploads straight to Cloudinary, but only with a signature issued here
+# (valid ~1 hour, bound to one folder). The API secret never leaves the server, and NO
+# unsigned upload preset is needed any more — so nobody else can upload to the account.
+UPLOAD_FOLDERS = {"photo": "competition-media", "document": "competition-files"}
+SAFE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+@app.route("/api/uploads/sign", methods=["POST"])
+def sign_upload():
+    decoded = verify_request_user()
+    if not decoded:
+        return jsonify({"error": "unauthorized"}), 401
+    if not require_admin(decoded):
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json(silent=True) or {}
+    kind = data.get("kind")
+    if kind not in UPLOAD_FOLDERS:
+        return jsonify({"error": "invalid kind"}), 400
+
+    folder = UPLOAD_FOLDERS[kind]
+    if kind == "photo":  # photos live in one folder per competition
+        competition_id = data.get("competitionId")
+        if not isinstance(competition_id, str) or not SAFE_ID.match(competition_id):
+            return jsonify({"error": "competitionId required"}), 400
+        folder = f"{folder}/{competition_id}"
+
+    cfg = cloudinary.config()
+    timestamp = int(time.time())
+    signature = cloudinary.utils.api_sign_request({"folder": folder, "timestamp": timestamp}, cfg.api_secret)
+    return jsonify({
+        "cloudName": cfg.cloud_name,
+        "apiKey": cfg.api_key,
+        "timestamp": timestamp,
+        "signature": signature,
+        "folder": folder,
+    })
+
+
 # ---------- Delete a competition media asset from Cloudinary (admin only) ----------
 @app.route("/api/media/delete", methods=["POST"])
 def delete_media():
@@ -420,15 +501,80 @@ def delete_media():
 
     data = request.get_json() or {}
     public_id = data.get("publicId")
-    if not public_id:
+    if not public_id or not isinstance(public_id, str) or len(public_id) > 300:
         return jsonify({"error": "publicId required"}), 400
+    # Photos and PDFs are "image" assets, Word files are "raw" (Cloudinary looks them up per type).
+    resource_type = data.get("resourceType") or "image"
+    if resource_type not in ("image", "raw"):
+        return jsonify({"error": "invalid resourceType"}), 400
 
     try:
-        cloudinary.uploader.destroy(public_id)
+        cloudinary.uploader.destroy(public_id, resource_type=resource_type)
     except Exception as e:
         print(f"cloudinary delete error: {e}")
         return jsonify({"error": "delete failed"}), 500
 
+    return jsonify({"ok": True})
+
+
+# ---------- Permanently delete a soft-deleted competition (admin only) ----------
+@app.route("/api/competitions/<competition_id>/permanent-delete", methods=["POST"])
+def permanent_delete_competition(competition_id):
+    decoded = verify_request_user()
+    if not decoded:
+        return jsonify({"error": "unauthorized"}), 401
+    if not require_admin(decoded):
+        return jsonify({"error": "forbidden"}), 403
+
+    comp_ref = db.collection("competitions").document(competition_id)
+    comp_snap = comp_ref.get()
+    if not comp_snap.exists:
+        return jsonify({"error": "not found"}), 404
+    # Safety: only a competition that is already in the trash can be erased for good.
+    if not comp_snap.to_dict().get("deleted"):
+        return jsonify({"error": "not in trash"}), 409
+
+    comp_data = comp_snap.to_dict()
+
+    # 0) Attachments (PDF/Word) linked to Cloudinary
+    for attachment in comp_data.get("attachments", []):
+        if not isinstance(attachment, dict):
+            continue
+        public_id = attachment.get("publicId")
+        if public_id:
+            try:
+                cloudinary.uploader.destroy(
+                    public_id,
+                    resource_type=attachment.get("resourceType", "image")
+                )
+            except Exception as e:
+                print(f"cloudinary delete error (attachment): {e}")
+
+    # 1) Photos: Cloudinary asset + its Firestore media doc
+    for media_snap in comp_ref.collection("media").stream():
+        public_id = (media_snap.to_dict() or {}).get("storagePath")
+        if public_id:
+            try:
+                cloudinary.uploader.destroy(public_id)
+            except Exception as e:
+                print(f"cloudinary delete error: {e}")
+        media_snap.reference.delete()
+
+    # 2) Every interaction (views / clicks / registrations) of this competition
+    batch = db.batch()
+    pending = 0
+    for snap in db.collection("competition_interactions").where("competitionId", "==", competition_id).stream():
+        batch.delete(snap.reference)
+        pending += 1
+        if pending == 400:
+            batch.commit()
+            batch = db.batch()
+            pending = 0
+    if pending:
+        batch.commit()
+
+    # 3) The competition document itself, last (so a failed run can simply be retried)
+    comp_ref.delete()
     return jsonify({"ok": True})
 
 

@@ -223,6 +223,8 @@
   .attachment-row svg{ width:26px; height:26px; flex:none; color:var(--navy-700); }
   .attachment-row .name{ flex:1; font-size:13.5px; font-weight:500; }
   .attachment-row a{ font-size:12.5px; color:var(--navy-700); text-decoration:none; font-weight:600; }
+  .attachments{ margin-bottom:10px; }
+  .attachments .attachment-row{ margin-bottom:10px; }
 
   .cta-link{
     display:flex; align-items:center; justify-content:center; gap:8px;
@@ -1172,8 +1174,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
     const s = strings[current];
     const countEl = document.getElementById("myRegsCount");
     const body = document.getElementById("regsBody");
+    const visibleRegsCount = myRegistrations.filter(r => competitions.some(x => x.id === r.competitionId)).length;
     if (countEl) {
-      countEl.textContent = (myRegistrationsState === "ready" && myRegistrations.length) ? `(${myRegistrations.length})` : "";
+      countEl.textContent = (myRegistrationsState === "ready" && competitionsLoaded && visibleRegsCount) ? `(${visibleRegsCount})` : "";
     }
     if (!body) return;
 
@@ -1505,17 +1508,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       </div>`;
     }
 
-    let attachmentHtml = "";
-    if (c.attachmentUrl) {
-      const attachmentHref = safeUrl(c.attachmentUrl);
-      if (attachmentHref) {
-        attachmentHtml = `<div class="attachment-row">
+    // New competitions carry an `attachments` list; older ones only have the single
+    // attachmentUrl/attachmentName pair — both render the same way.
+    const attachmentList = Array.isArray(c.attachments) && c.attachments.length
+      ? c.attachments
+      : (c.attachmentUrl ? [{ url: c.attachmentUrl, name: c.attachmentName }] : []);
+    const attachmentRows = attachmentList.map(a => {
+      const attachmentHref = safeUrl(a && a.url);
+      if (!attachmentHref) return "";
+      return `<div class="attachment-row">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
-          <span class="name">${escapeHtml(c.attachmentName || strings[current].attachment)}</span>
+          <span class="name">${escapeHtml((a && a.name) || strings[current].attachment)}</span>
           <a href="${attachmentHref}" target="_blank" rel="noopener">${strings[current].openFile}</a>
         </div>`;
-      }
-    }
+    }).join("");
+    const attachmentHtml = attachmentRows ? `<div class="attachments">${attachmentRows}</div>` : "";
 
     // Check whether the current student already submitted the in-app
     // registration form for this competition (drives the funnel + admin

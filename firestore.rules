@@ -7,6 +7,7 @@ service cloud.firestore {
     function isUniversityAccount() {
       return request.auth != null
         && request.auth.token.email != null
+        && request.auth.token.email_verified == true
         && request.auth.token.email.matches('.*@feng[.]bu[.]edu[.]eg$');
     }
 
@@ -26,7 +27,10 @@ service cloud.firestore {
                     && request.resource.data.role == "student";
       allow update: if isUniversityAccount()
                     && request.auth.uid == userId
-                    && request.resource.data.role == resource.data.role; // role field is locked
+                    && request.resource.data.role == resource.data.role
+                    && request.resource.data.universityEmail == resource.data.universityEmail
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.createdAt == resource.data.createdAt; // identity fields are locked
       allow read, write: if isAdmin();
     }
 

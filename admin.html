@@ -217,6 +217,9 @@
   .lang-row button.active{ background:rgba(255,255,255,0.14); color:#fff; border-color:rgba(255,255,255,0.3); }
 
   /* ---------- Disable browser pull-to-refresh in the installed PWA only ---------- */
+  @media (display-mode: standalone){
+    html, body{ overscroll-behavior-y: contain; }
+  }
   @media (prefers-reduced-motion: reduce){
     *{ animation-duration:0.01ms !important; transition-duration:0.01ms !important; }
   }
@@ -330,8 +333,12 @@
         <p style="font-size:12px;color:var(--ink-soft);margin:-10px 0 14px;line-height:1.6;" id="hintDeadlines">
           The two dates are separate — you can renew the application deadline any time after publishing using the "Renew deadline" button on the competition, without changing the overall competition date.
         </p>
-        <div class="field"><label id="lblFAttachUrl">PDF/Word attachment (URL after uploading to Firebase Storage)</label><input type="text" id="fAttachUrl" placeholder="https://..."></div>
-        <div class="field"><label id="lblFAttachName">Displayed file name</label><input type="text" id="fAttachName" placeholder="competition_details.pdf"></div>
+        <div class="field">
+          <label id="lblFAttachFile">Attachments — PDF/Word (optional, up to 10 files)</label>
+          <input type="file" id="fAttachFile" multiple accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;">
+          <button type="button" class="btn secondary small" id="pickAttachBtn" style="width:100%;">📎 <span id="pickAttachLabel">Add files from your device</span></button>
+          <div id="attachList" style="margin-top:8px;"></div>
+        </div>
         <div class="field">
           <label id="lblFWhatsapp">Competition WhatsApp group link (optional)</label>
           <input type="text" id="fWhatsapp" placeholder="https://chat.whatsapp.com/xxxxxxxx">
@@ -447,8 +454,8 @@
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
-  const CLOUDINARY_CLOUD_NAME = "o9hpm4kn"; // من Cloudinary Dashboard
-  const CLOUDINARY_UPLOAD_PRESET = "competition_media_unsigned"; // الـ preset اللي عملته فوق
+  // Cloudinary uploads are SIGNED by Railway (POST /api/uploads/sign): no unsigned preset and no
+  // hard-coded cloud name are needed in the browser any more.
 
   let competitions = [];
   let editingId = null;
@@ -511,6 +518,9 @@
       btnReopen: "Reopen",
       btnDelete: "🗑️ Delete",
       btnRestore: "↩️ Restore competition",
+      btnPermanentDelete: "❌ Delete permanently",
+      permanentDeleteConfirm: (title) => `Permanently delete "${title}"?\nThe competition, all student registrations and its photos will be erased and this CANNOT be undone.`,
+      permanentDeleteFailed: "Couldn't delete the competition permanently. Check your connection and try again.",
       btnManagePhotos: "📷 Manage Photos",
       managePhotosModalTitle: "Manage Photos",
       emptyStudents: "No students have submitted the form yet.",
@@ -534,9 +544,16 @@
       lblFDeadline: "Overall competition deadline (results/event date)",
       lblFAppDeadline: "Application deadline",
       hintDeadlines: 'The two dates are separate — you can renew the application deadline any time after publishing using the "Renew deadline" button on the competition, without changing the overall competition date.',
-      lblFAttachUrl: "PDF/Word attachment (URL after uploading to Firebase Storage)",
-      lblFAttachName: "Displayed file name",
-      attachNamePlaceholder: "competition_details.pdf",
+      lblFAttachFile: "Attachments — PDF/Word (optional, up to 10 files)",
+      pickAttachFile: "Add files from your device",
+      attachRemove: "Remove",
+      attachUploading: "Uploading…",
+      attachBadType: "Only PDF, DOC or DOCX files are allowed",
+      attachTooBig: "Larger than 10 MB",
+      attachTooMany: "Maximum 10 files per competition",
+      attachUploadFailed: "Upload failed — remove it and try again",
+      attachStillUploading: "Please wait until all files finish uploading.",
+      attachHasErrors: "Some files failed or were rejected. Remove them (✕) or add them again before publishing.",
       lblFWhatsapp: "Competition WhatsApp group link (optional)",
       hintWhatsapp: 'Shown to the student as a "Join group" button right after they register — if the competition needs an external form, send it in the group after members join.',
       cancel: "Cancel",
@@ -619,6 +636,9 @@
       btnReopen: "إعادة فتح",
       btnDelete: "🗑️ حذف",
       btnRestore: "↩️ استرجاع المسابقة",
+      btnPermanentDelete: "❌ حذف نهائي",
+      permanentDeleteConfirm: (title) => `تحذف "${title}" نهائيًا؟\nهتتمسح المسابقة وكل تسجيلات الطلبة وصورها ومش هتقدر ترجعها تاني.`,
+      permanentDeleteFailed: "مقدرناش نمسح المسابقة نهائيًا. اتأكد من الاتصال وحاول تاني.",
       btnManagePhotos: "📷 إدارة الصور",
       managePhotosModalTitle: "إدارة صور المسابقة",
       emptyStudents: "لسه مفيش طلبة قدّموا الفورم.",
@@ -642,9 +662,16 @@
       lblFDeadline: "الموعد النهائي للمسابقة ككل (نتيجة/فعالية المسابقة)",
       lblFAppDeadline: "آخر موعد للتقديم",
       hintDeadlines: 'الموعدين منفصلين — تقدر تجدّد آخر موعد للتقديم في أي وقت بعد النشر من زرار "تجديد ميعاد التقديم" على المسابقة، من غير ما تغيّر ميعاد المسابقة ككل.',
-      lblFAttachUrl: "مرفق PDF/Word (رابط بعد الرفع على Firebase Storage)",
-      lblFAttachName: "اسم الملف المعروض",
-      attachNamePlaceholder: "تفاصيل_المسابقة.pdf",
+      lblFAttachFile: "مرفقات PDF/Word (اختياري، لحد 10 ملفات)",
+      pickAttachFile: "إضافة ملفات من الجهاز",
+      attachRemove: "إزالة",
+      attachUploading: "جارِ الرفع...",
+      attachBadType: "مسموح بملفات PDF أو DOC أو DOCX بس",
+      attachTooBig: "أكبر من 10MB",
+      attachTooMany: "أقصى عدد 10 ملفات للمسابقة",
+      attachUploadFailed: "فشل الرفع — شيله وحاول تاني",
+      attachStillUploading: "استنى لحد ما كل الملفات تخلص رفع.",
+      attachHasErrors: "في ملفات فشلت أو اترفضت. شيلها (✕) أو ضيفها تاني قبل النشر.",
       lblFWhatsapp: "لينك جروب الواتساب الخاص بالمسابقة (اختياري)",
       hintWhatsapp: 'بيظهر للطالب كزرار "انضم للجروب" فور ما يسجل بياناته في المسابقة — لو المسابقة محتاجة فورم خارجي (من جهة تانية)، ابعته على الجروب نفسه بعد ما الأعضاء ينضموا.',
       cancel: "إلغاء",
@@ -696,6 +723,18 @@
     }
   };
 
+  // ---------- Competition attachments (PDF / Word, several files) ----------
+  // Each file is uploaded straight from the admin's device to Cloudinary using a signature from Railway.
+  // On publish the list is sent to the Flask API and saved as competitions/{id}.attachments.
+  const ATTACH_MAX_BYTES = 10 * 1024 * 1024;   // Cloudinary free plan: 10 MB per non-image file
+  const ATTACH_MAX_FILES = 10;                 // keep in sync with MAX_ATTACHMENTS in app.py
+  const ATTACH_EXTS = ["pdf", "doc", "docx"];
+  let attachments = [];   // [{ id, name, url, publicId, resourceType, uploading, errorKey }]
+  let attachSeq = 0;
+  // true once a publish request carrying these files has been sent: from then on we can't be sure the
+  // competition doesn't exist (e.g. the reply got lost), so we NEVER auto-delete the files.
+  let attachmentsMaybePublished = false;
+
   let currentLang = localStorage.getItem("uch_admin_lang") === "ar" ? "ar" : "en";
   const t = (key) => STR[currentLang][key];
 
@@ -744,9 +783,8 @@
     document.getElementById("lblFDeadline").textContent = t("lblFDeadline");
     document.getElementById("lblFAppDeadline").textContent = t("lblFAppDeadline");
     document.getElementById("hintDeadlines").textContent = t("hintDeadlines");
-    document.getElementById("lblFAttachUrl").textContent = t("lblFAttachUrl");
-    document.getElementById("lblFAttachName").textContent = t("lblFAttachName");
-    document.getElementById("fAttachName").placeholder = t("attachNamePlaceholder");
+    document.getElementById("lblFAttachFile").textContent = t("lblFAttachFile");
+    renderAttachList(); // also re-translates the button label and every file row
     document.getElementById("lblFWhatsapp").textContent = t("lblFWhatsapp");
     document.getElementById("hintWhatsapp").textContent = t("hintWhatsapp");
     document.getElementById("cancelCompBtn").textContent = t("cancel");
@@ -918,6 +956,7 @@
       document.getElementById("totalCount").textContent = competitions.filter(c => !c.deleted).length;
       const trashCountEl = document.getElementById("trashCount");
       if (trashCountEl) trashCountEl.textContent = competitions.filter(c => c.deleted).length;
+      if (document.getElementById("trashModalScrim").classList.contains("show")) renderTrashList();
 
       if (structural) {
         renderCompetitionList();
@@ -1057,7 +1096,11 @@
     container.querySelectorAll('[data-action="close"]').forEach(btn =>
       btn.addEventListener("click", () => openWinnerModal(btn.dataset.id)));
     container.querySelectorAll('[data-action="reopen"]').forEach(btn =>
-      btn.addEventListener("click", () => updateDoc(doc(db, "competitions", btn.dataset.id), { status: "open" })));
+      btn.addEventListener("click", () => updateDoc(doc(db, "competitions", btn.dataset.id), {
+        status: "open",
+        reminder48hSent: false,
+        reminder24hSent: false
+      })));
     container.querySelectorAll('[data-action="delete"]').forEach(btn =>
       btn.addEventListener("click", () => deleteCompetition(btn.dataset.id)));
 
@@ -1092,6 +1135,27 @@
     renderTrashList();
   }
 
+  async function permanentlyDeleteCompetition(competitionId, btn) {
+    const c = competitions.find(x => x.id === competitionId);
+    if (!c) return;
+    if (!navigator.onLine) { alert(t("offlineAction")); return; }
+    if (!confirm(t("permanentDeleteConfirm")(c.title))) return;
+    if (btn) btn.disabled = true;
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API_BASE}/api/competitions/${competitionId}/permanent-delete`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("request failed");
+      // the realtime competitions listener removes it from the trash list by itself
+    } catch (err) {
+      console.error("permanent delete error:", err);
+      alert(t("permanentDeleteFailed"));
+      if (btn) btn.disabled = false;
+    }
+  }
+
   function formatDeletedAt(ts) {
     if (!ts || !ts.toDate) return "—";
     return ts.toDate().toLocaleString(t("dateLocale"), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -1119,11 +1183,14 @@
         </div>
         <div class="comp-actions">
           <button class="btn small" data-restore="${c.id}">${t("btnRestore")}</button>
+          <button class="btn small danger" data-permadelete="${c.id}">${t("btnPermanentDelete")}</button>
         </div>
       </div>`).join("");
 
     list.querySelectorAll("[data-restore]").forEach(btn =>
       btn.addEventListener("click", () => restoreCompetition(btn.dataset.restore)));
+    list.querySelectorAll("[data-permadelete]").forEach(btn =>
+      btn.addEventListener("click", () => permanentlyDeleteCompetition(btn.dataset.permadelete, btn)));
   }
 
   function openTrashModal() {
@@ -1510,27 +1577,25 @@
     try {
       const blob = await compressImage(file);
 
-      const formData = new FormData();
-      formData.append("file", blob);
-      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-      formData.append("folder", `competition-media/${mediaCompId}`);
-
-      const uploadRes = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-        { method: "POST", body: formData }
-      );
-      if (!uploadRes.ok) throw new Error("cloudinary upload failed");
-      const uploadData = await uploadRes.json();
+      // Signed upload: Railway (admin-only) issues a short-lived signature, so no unsigned preset is needed.
+      const sig = await getUploadSignature("photo", mediaCompId);
+      const uploadData = await uploadToCloudinary(blob, "image", sig);
       // storagePath repurposed to hold the Cloudinary public_id — needed
       // server-side later to delete the asset (deletion requires the API secret).
       const url = uploadData.secure_url;
       const storagePath = uploadData.public_id;
 
       const order = mediaItems.filter(m => !m._pending).length;
-      await addDoc(collection(db, "competitions", mediaCompId, "media"), {
-        url, storagePath, caption: "", order,
-        uploadedAt: serverTimestamp(), uploadedBy: auth.currentUser.uid,
-      });
+      try {
+        await addDoc(collection(db, "competitions", mediaCompId, "media"), {
+          url, storagePath, caption: "", order,
+          uploadedAt: serverTimestamp(), uploadedBy: auth.currentUser.uid,
+        });
+      } catch (saveErr) {
+        // The image is on Cloudinary but was never linked to the competition — delete it.
+        deleteCloudinaryAsset(storagePath, "image");
+        throw saveErr;
+      }
       await loadMediaFor(mediaCompId);
     } catch (err) {
       console.error("upload error:", err);
@@ -1577,10 +1642,153 @@
     await loadMediaFor(mediaCompId);
   }
 
+  // ---------- Signed Cloudinary uploads + cleanup (through Railway) ----------
+  async function getUploadSignature(kind, competitionId) {
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch(`${API_BASE}/api/uploads/sign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({ kind, competitionId: competitionId || null })
+    });
+    if (!res.ok) throw new Error("upload signature request failed: " + res.status);
+    return res.json(); // { cloudName, apiKey, timestamp, signature, folder }
+  }
+
+  async function uploadToCloudinary(file, resourceType, sig) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("api_key", sig.apiKey);
+    formData.append("timestamp", sig.timestamp);
+    formData.append("signature", sig.signature);
+    formData.append("folder", sig.folder);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/${resourceType}/upload`, { method: "POST", body: formData });
+    if (!res.ok) throw new Error("cloudinary upload failed: " + res.status);
+    return res.json();
+  }
+
+  // Fire-and-forget cleanup of an asset that is not (or no longer) linked to anything. Never throws.
+  function deleteCloudinaryAsset(publicId, resourceType) {
+    if (!publicId) return;
+    (async () => {
+      try {
+        const token = await auth.currentUser.getIdToken();
+        await fetch(`${API_BASE}/api/media/delete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({ publicId, resourceType: resourceType || "image" })
+        });
+      } catch (e) {
+        console.warn("cloudinary cleanup failed:", e);
+      }
+    })();
+  }
+
+  // ---------- Competition attachments: pick + upload (several files) ----------
+  function renderAttachList() {
+    const list = document.getElementById("attachList");
+    const label = document.getElementById("pickAttachLabel");
+    if (!list || !label) return;
+    const okCount = attachments.filter(a => !a.errorKey).length;
+    label.textContent = okCount ? `${t("pickAttachFile")} (${okCount}/${ATTACH_MAX_FILES})` : t("pickAttachFile");
+    list.innerHTML = "";
+    attachments.forEach((a) => {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px;font-size:12.5px;line-height:1.5;";
+      const text = document.createElement("span");
+      text.style.cssText = "flex:1;min-width:0;overflow-wrap:anywhere;";
+      // textContent everywhere: a file name can never inject HTML
+      if (a.errorKey) { text.style.color = "var(--coral)"; text.textContent = `⚠️ ${a.name} — ${t(a.errorKey)}`; }
+      else if (a.uploading) { text.style.color = "var(--ink-soft)"; text.textContent = `⏳ ${a.name} — ${t("attachUploading")}`; }
+      else { text.textContent = `✅ ${a.name}`; }
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn secondary small";
+      remove.setAttribute("aria-label", t("attachRemove"));
+      remove.textContent = "✕";
+      remove.addEventListener("click", () => removeAttachment(a.id));
+      row.append(text, remove);
+      list.appendChild(row);
+    });
+  }
+
+  function removeAttachment(id) {
+    const row = attachments.find(a => a.id === id);
+    attachments = attachments.filter(a => a.id !== id);
+    // Already on Cloudinary but never published → delete it there too. (An upload still running for
+    // this row deletes its own result when it finishes and finds the row gone.)
+    if (row && row.publicId && !attachmentsMaybePublished) deleteCloudinaryAsset(row.publicId, row.resourceType);
+    renderAttachList();
+  }
+
+  // Empties the list. Files of a form that was never published are deleted from Cloudinary;
+  // if a publish was attempted (outcome possibly unknown) nothing is deleted.
+  function discardAttachments() {
+    if (!attachmentsMaybePublished) attachments.forEach(a => deleteCloudinaryAsset(a.publicId, a.resourceType));
+    attachments = [];
+    attachmentsMaybePublished = false;
+    renderAttachList();
+  }
+
+  async function uploadAttachment(id, file) {
+    let uploaded = null;
+    try {
+      const sig = await getUploadSignature("document");
+      // "auto" lets Cloudinary pick the type: PDFs are stored as image-type assets, Word files as raw.
+      const data = await uploadToCloudinary(file, "auto", sig);
+      if (!data.secure_url || !data.public_id) throw new Error("cloudinary returned no url");
+      uploaded = data;
+    } catch (err) {
+      console.error("attachment upload error:", err);
+    }
+
+    const row = attachments.find(a => a.id === id);
+    if (uploaded) {
+      if (!row) {
+        // Removed (or the form was closed) while this file was uploading → don't leave it behind.
+        deleteCloudinaryAsset(uploaded.public_id, uploaded.resource_type);
+        return;
+      }
+      row.url = uploaded.secure_url;
+      row.publicId = uploaded.public_id;
+      row.resourceType = uploaded.resource_type === "raw" ? "raw" : "image";
+      row.uploading = false;
+    } else if (row) {
+      row.uploading = false;
+      row.errorKey = "attachUploadFailed";
+    }
+    renderAttachList();
+  }
+
+  async function handleAttachmentsPicked(files) {
+    const queue = [];
+    for (const file of files) {
+      const row = { id: ++attachSeq, name: file.name, url: null, publicId: null, resourceType: null, uploading: false, errorKey: null };
+      const ext = (file.name.split(".").pop() || "").toLowerCase(); // by extension: phones often report an empty MIME type for .docx
+      if (attachments.filter(a => !a.errorKey).length >= ATTACH_MAX_FILES) row.errorKey = "attachTooMany";
+      else if (!ATTACH_EXTS.includes(ext)) row.errorKey = "attachBadType";
+      else if (file.size > ATTACH_MAX_BYTES) row.errorKey = "attachTooBig";
+      else if (!navigator.onLine) row.errorKey = "offlineAction";
+      else { row.uploading = true; queue.push({ id: row.id, file }); }
+      attachments.push(row);
+    }
+    renderAttachList();
+    // One file at a time: gentler on phone connections, and rejected files are already shown above.
+    for (const item of queue) await uploadAttachment(item.id, item.file);
+  }
+
+  document.getElementById("pickAttachBtn").addEventListener("click", () =>
+    document.getElementById("fAttachFile").click());
+  document.getElementById("fAttachFile").addEventListener("change", (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ""; // allow picking the same file again later
+    if (files.length) handleAttachmentsPicked(files);
+  });
+
   // ---------- Create competition modal ----------
   document.getElementById("newCompBtn").addEventListener("click", () => {
     editingId = null;
     document.getElementById("compForm").reset();
+    discardAttachments();
     document.getElementById("compFieldsWrap").style.display = "block";
     document.getElementById("submitCompBtn").style.display = "inline-block";
     document.getElementById("cancelCompBtn").textContent = t("cancel");
@@ -1588,8 +1796,10 @@
     loadMediaFor(null);
     document.getElementById("compModalScrim").classList.add("show");
   });
-  document.getElementById("cancelCompBtn").addEventListener("click", () =>
-    document.getElementById("compModalScrim").classList.remove("show"));
+  document.getElementById("cancelCompBtn").addEventListener("click", () => {
+    if (!editingId) discardAttachments(); // not published yet: clean up what was uploaded for this form
+    document.getElementById("compModalScrim").classList.remove("show");
+  });
 
   document.getElementById("compForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1598,15 +1808,22 @@
       document.getElementById("compModalScrim").classList.remove("show");
       return;
     }
+    if (attachments.some(a => a.uploading)) { alert(t("attachStillUploading")); return; }
+    if (attachments.some(a => a.errorKey)) { alert(t("attachHasErrors")); return; }
+    const uploadedFiles = attachments
+      .filter(a => a.url)
+      .map(a => ({ url: a.url, name: a.name, publicId: a.publicId, resourceType: a.resourceType }));
     if (!navigator.onLine) { alert(t("offlineAction")); return; }
+    attachmentsMaybePublished = uploadedFiles.length > 0; // from here on the outcome may be unknown → never auto-delete
     const payload = {
       title: document.getElementById("fTitle").value.trim(),
       description: document.getElementById("fDesc").value.trim(),
       link: document.getElementById("fLink").value.trim(),
       deadline: document.getElementById("fDeadline").value,
       applicationDeadline: document.getElementById("fAppDeadline").value,
-      attachmentUrl: document.getElementById("fAttachUrl").value.trim() || null,
-      attachmentName: document.getElementById("fAttachName").value.trim() || null,
+      attachments: uploadedFiles,
+      attachmentUrl: uploadedFiles.length ? uploadedFiles[0].url : null,
+      attachmentName: uploadedFiles.length ? uploadedFiles[0].name : null,
       whatsappGroupLink: document.getElementById("fWhatsapp").value.trim() || null,
     };
 
@@ -1620,6 +1837,10 @@
     });
     const result = await res.json().catch(() => ({}));
     if (!res.ok || !result.id) { alert(t("publishFailed")); return; }
+    // Published: these files belong to the competition now — reset the list, never clean them up.
+    attachments = [];
+    attachmentsMaybePublished = false;
+    renderAttachList();
 
     // Now that the competition has an id, photos can be attached — keep
     // the modal open in "manage photos" mode instead of closing it.
@@ -1664,7 +1885,11 @@
   document.getElementById("confirmRenewBtn").addEventListener("click", async () => {
     const newValue = document.getElementById("fRenewAppDeadline").value;
     if (!newValue || !renewingId) return;
-    await updateDoc(doc(db, "competitions", renewingId), { applicationDeadline: newValue });
+    await updateDoc(doc(db, "competitions", renewingId), {
+      applicationDeadline: newValue,
+      reminder48hSent: false,
+      reminder24hSent: false
+    });
     document.getElementById("renewModalScrim").classList.remove("show");
   });
 
