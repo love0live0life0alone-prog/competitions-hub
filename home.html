@@ -166,6 +166,12 @@
     background-position:right 12px center;
   }
   html[dir="rtl"] .edit-field select{ background-position:left 12px center; }
+  .edit-field select:disabled{
+    background-color:rgba(255,255,255,0.04);
+    color:rgba(255,255,255,0.35);
+    border-color:rgba(255,255,255,0.08);
+    cursor:not-allowed;
+  }
   .edit-field select option{ color:#000; }
   .save-btn{
     width:100%; margin-top:6px; padding:10px; border-radius:8px; border:none;
@@ -550,16 +556,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       </div>
       <div class="edit-field">
         <label id="lblDept">القسم</label>
-        <select id="editDept">
-          <option value="هندسة الإنتاج">هندسة الإنتاج</option><option value="هندسة القوى الميكانيكية">هندسة القوى الميكانيكية</option>
-          <option value="هندسة الحاسبات">هندسة الحاسبات</option><option value="الهندسة الكهربية">الهندسة الكهربية</option>
-        </select>
+        <select id="editDept"></select>
       </div>
       <div class="edit-field">
-        <label id="lblMajor">التخصص</label>
-        <select id="editMajor">
-          <option value="عام">عام</option><option value="تصنيع">تصنيع</option><option value="تصميم ميكانيكي">تصميم ميكانيكي</option>
-        </select>
+        <label id="lblMajor">البرنامج</label>
+        <select id="editMajor" disabled></select>
       </div>
       <div class="edit-field">
         <label id="lblYear">الفرقة</label>
@@ -781,16 +782,39 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   // Canonical value stays Arabic (so stored Firestore data never changes),
   // only the displayed label switches with the language.
   const DEPTS = [
-    { value:"هندسة الإنتاج", ar:"هندسة الإنتاج", en:"Production Engineering" },
-    { value:"هندسة القوى الميكانيكية", ar:"هندسة القوى الميكانيكية", en:"Mechanical Power Engineering" },
-    { value:"هندسة الحاسبات", ar:"هندسة الحاسبات", en:"Computer Engineering" },
-    { value:"الهندسة الكهربية", ar:"الهندسة الكهربية", en:"Electrical Engineering" }
+    { value:"قسم العلوم الأساسية", ar:"قسم العلوم الأساسية", en:"Basic Sciences Department" },
+    { value:"قسم الهندسة الكهربائية", ar:"قسم الهندسة الكهربائية", en:"Electrical Engineering Department" },
+    { value:"قسم هندسة الاتصالات", ar:"قسم هندسة الاتصالات", en:"Communications Engineering Department" },
+    { value:"قسم الهندسة الميكانيكية", ar:"قسم الهندسة الميكانيكية", en:"Mechanical Engineering Department" },
+    { value:"قسم الهندسة المدنية", ar:"قسم الهندسة المدنية", en:"Civil Engineering Department" },
+    { value:"قسم الهندسة المعمارية", ar:"قسم الهندسة المعمارية", en:"Architectural Engineering Department" },
+    { value:"قسم هندسة الجيوماتكس", ar:"قسم هندسة الجيوماتكس", en:"Geomatics Engineering Department" }
   ];
-  const MAJORS = [
-    { value:"عام", ar:"عام", en:"General" },
-    { value:"تصنيع", ar:"تصنيع", en:"Manufacturing" },
-    { value:"تصميم ميكانيكي", ar:"تصميم ميكانيكي", en:"Mechanical Design" }
-  ];
+  const PROGRAMS_BY_DEPT = {
+    "قسم العلوم الأساسية": [],
+    "قسم الهندسة الكهربائية": [
+      { value:"هندسة القوى والآلات الكهربائية", ar:"هندسة القوى والآلات الكهربائية", en:"Electrical Power and Machines Engineering" }
+    ],
+    "قسم هندسة الاتصالات": [
+      { value:"هندسة الاتصالات والإلكترونيات", ar:"هندسة الاتصالات والإلكترونيات", en:"Communications and Electronics Engineering" },
+      { value:"هندسة نظم الحاسبات", ar:"هندسة نظم الحاسبات", en:"Computer Systems Engineering" }
+    ],
+    "قسم الهندسة الميكانيكية": [
+      { value:"هندسة الإنتاج والتصميم الميكانيكي", ar:"هندسة الإنتاج والتصميم الميكانيكي", en:"Production and Mechanical Design Engineering" },
+      { value:"هندسة القوى الميكانيكية", ar:"هندسة القوى الميكانيكية", en:"Mechanical Power Engineering" },
+      { value:"هندسة الميكاترونكس", ar:"هندسة الميكاترونكس", en:"Mechatronics Engineering" }
+    ],
+    "قسم الهندسة المدنية": [
+      { value:"الهندسة المدنية العامة", ar:"الهندسة المدنية العامة", en:"General Civil Engineering" },
+      { value:"الهندسة المدنية الإنشائية", ar:"الهندسة المدنية الإنشائية", en:"Structural Civil Engineering" }
+    ],
+    "قسم الهندسة المعمارية": [
+      { value:"الهندسة المعمارية", ar:"الهندسة المعمارية", en:"Architectural Engineering" }
+    ],
+    "قسم هندسة الجيوماتكس": [
+      { value:"هندسة الجيوماتكس", ar:"هندسة الجيوماتكس", en:"Geomatics Engineering" }
+    ]
+  };
   const YEARS = [
     { value:"الأولى", ar:"الأولى", en:"1st Year" },
     { value:"الثانية", ar:"الثانية", en:"2nd Year" },
@@ -806,6 +830,25 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   function translateValue(list, arValue, lang){
     const found = list.find(item => item.value === arValue);
     return found ? found[lang] : (arValue || "");
+  }
+
+  function fillDeptSelect(deptEl, lang, selected){
+    deptEl.innerHTML = `<option value="">${strings[lang].selectDept}</option>` +
+      DEPTS.map(d => `<option value="${d.value}">${d[lang]}</option>`).join("");
+    deptEl.value = DEPTS.some(d => d.value === selected) ? selected : "";
+  }
+  function fillProgramSelect(programEl, deptValue, lang, selected){
+    const list = PROGRAMS_BY_DEPT[deptValue] || [];
+    let placeholder = strings[lang].selectDeptFirst;
+    if (deptValue) placeholder = list.length ? strings[lang].selectProgram : strings[lang].noProgram;
+    programEl.innerHTML = `<option value="">${placeholder}</option>` +
+      list.map(p => `<option value="${p.value}">${p[lang]}</option>`).join("");
+    programEl.disabled = list.length === 0;
+    programEl.value = list.some(p => p.value === selected) ? selected : "";
+  }
+  function refreshDeptProgram(deptEl, programEl, lang){
+    fillDeptSelect(deptEl, lang, deptEl.value);
+    fillProgramSelect(programEl, deptEl.value, lang, programEl.value);
   }
 
   // ---------- Auth guard ----------
@@ -895,8 +938,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       `${deptLabel} · ${strings[current].yearPrefix} ${yearLabel}`;
 
     document.getElementById("editFullName").value = userProfile.fullName || "";
-    if (userProfile.department) document.getElementById("editDept").value = userProfile.department;
-    if (userProfile.major) document.getElementById("editMajor").value = userProfile.major;
+    const editDeptEl = document.getElementById("editDept");
+    const editMajorEl = document.getElementById("editMajor");
+    fillDeptSelect(editDeptEl, current, userProfile.department);
+    fillProgramSelect(editMajorEl, editDeptEl.value, current, userProfile.major);
     if (userProfile.academicYear) document.getElementById("editYear").value = userProfile.academicYear;
 
     document.getElementById("adminLink").style.display = userProfile.role === "admin" ? "flex" : "none";
@@ -905,6 +950,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
 
   // ---------- Save profile edits ----------
   document.getElementById("saveProfileBtn").addEventListener("click", async () => {
+    const deptVal = document.getElementById("editDept").value;
+    const progVal = document.getElementById("editMajor").value;
+    if (!deptVal) { alert(strings[current].errDept); return; }
+    if ((PROGRAMS_BY_DEPT[deptVal] || []).length > 0 && !progVal) { alert(strings[current].errProgram); return; }
     const updated = {
       fullName: document.getElementById("editFullName").value.trim() || currentUser.email.split("@")[0],
       department: document.getElementById("editDept").value,
@@ -918,6 +967,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   });
 
   document.getElementById("logoutBtn").addEventListener("click", () => signOut(auth));
+
+  document.getElementById("editDept").addEventListener("change", () => {
+    fillProgramSelect(document.getElementById("editMajor"), document.getElementById("editDept").value, current, "");
+  });
 
   // ---------- Contacts (youth-care staff) ----------
   const contacts = [
@@ -1717,7 +1770,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       lang_label:"اللغة", edit_label:"تعديل البيانات", contact_label:"تواصل معنا — رعاية الشباب",
       fullName:"الاسم بالكامل",
       adminLink:"لوحة تحكم المسؤولين",
-      dept:"القسم", major:"التخصص", year:"الفرقة", save:"حفظ التعديلات", logout:"تسجيل الخروج",
+      dept:"القسم", major:"البرنامج", year:"الفرقة", save:"حفظ التعديلات", logout:"تسجيل الخروج",
+      selectDept:"اختر القسم", selectProgram:"اختر البرنامج", selectDeptFirst:"اختر القسم أولاً",
+      noProgram:"لا توجد برامج لهذا القسم",
+      errDept:"من فضلك اختار القسم.", errProgram:"من فضلك اختار البرنامج.",
       empty:"مفيش إعلانات دلوقتي، تابعنا أول بأول.",
       deadlinePrefix:"آخر موعد للتقديم:", ended:"المسابقة انتهت", yearPrefix:"الفرقة",
       finalDeadlinePrefix:"الموعد النهائي للمسابقة:",
@@ -1769,7 +1825,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
       lang_label:"Language", edit_label:"Edit profile", contact_label:"Contact us — Student Affairs",
       fullName:"Full name",
       adminLink:"Admin Dashboard",
-      dept:"Department", major:"Major", year:"Academic year", save:"Save changes", logout:"Sign out",
+      dept:"Department", major:"Program", year:"Academic year", save:"Save changes", logout:"Sign out",
+      selectDept:"Select department", selectProgram:"Select program", selectDeptFirst:"Select a department first",
+      noProgram:"No programs for this department",
+      errDept:"Please select your department.", errProgram:"Please select your program.",
       empty:"No announcements yet — check back soon.",
       deadlinePrefix:"Deadline:", ended:"Competition ended", yearPrefix:"Year",
       finalDeadlinePrefix:"Overall competition deadline:",
@@ -1838,8 +1897,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
     document.getElementById("logoutBtn").textContent = s.logout;
     document.getElementById("btnAr").classList.toggle("active", code === "ar");
     document.getElementById("btnEn").classList.toggle("active", code === "en");
-    translateSelect(document.getElementById("editDept"), DEPTS, code);
-    translateSelect(document.getElementById("editMajor"), MAJORS, code);
+    refreshDeptProgram(document.getElementById("editDept"), document.getElementById("editMajor"), code);
     translateSelect(document.getElementById("editYear"), YEARS, code);
 
     // ---- Registration modal ----

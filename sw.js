@@ -6,8 +6,8 @@
 // - Basic Background Sync queue for offline interactions
 // ============================================================
 
-const APP_SHELL_CACHE = "uch-shell-v7";
-const DATA_CACHE = "uch-data-v7";
+const APP_SHELL_CACHE = "uch-shell-v8";
+const DATA_CACHE = "uch-data-v8";
 
 const APP_SHELL_FILES = [
   "./",

@@ -192,6 +192,12 @@
     border-color:var(--navy-700);
     background:#fff;
   }
+  .field select:disabled{
+    background-color:#E4E6EB;
+    color:#9AA1B2;
+    cursor:not-allowed;
+    opacity:.75;
+  }
   .field .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
   .btn-primary{
@@ -308,7 +314,7 @@
 
     <div class="stat-strip" data-anim id="statStrip">
       <div><strong>+40</strong><span>مسابقة نشطة</span></div>
-      <div><strong>4</strong><span>أقسام</span></div>
+      <div><strong>7</strong><span>أقسام</span></div>
       <div><strong>لحظي</strong><span>إشعارات فورية</span></div>
     </div>
   </section>
@@ -365,21 +371,12 @@
         </div>
         <div class="field">
           <label id="lblDept">القسم</label>
-          <select id="dept">
-            <option value="هندسة الإنتاج">هندسة الإنتاج</option>
-            <option value="هندسة القوى الميكانيكية">هندسة القوى الميكانيكية</option>
-            <option value="هندسة الحاسبات">هندسة الحاسبات</option>
-            <option value="الهندسة الكهربية">الهندسة الكهربية</option>
-          </select>
+          <select id="dept"></select>
         </div>
         <div class="field row2">
           <div>
-            <label id="lblMajor">التخصص</label>
-            <select id="major">
-              <option value="عام">عام</option>
-              <option value="تصنيع">تصنيع</option>
-              <option value="تصميم ميكانيكي">تصميم ميكانيكي</option>
-            </select>
+            <label id="lblMajor">البرنامج</label>
+            <select id="major" disabled></select>
           </div>
           <div>
             <label id="lblYear">الفرقة</label>
@@ -426,7 +423,10 @@
       lblEmailIn:"الإيميل الجامعي", lblPassIn:"كلمة المرور", signinBtn:"تسجيل الدخول", forgotBtn:"نسيت كلمة المرور؟",
       lblEmailUp:"الإيميل الجامعي", lblPassUp:"كلمة المرور", lblPassConfirm:"تأكيد كلمة المرور", signupBtn:"إنشاء الحساب",
       lblFullName:"الاسم بالكامل",
-      lblDept:"القسم", lblMajor:"التخصص", lblYear:"الفرقة", lblSid:"الرقم الجامعي",
+      lblDept:"القسم", lblMajor:"البرنامج", lblYear:"الفرقة", lblSid:"الرقم الجامعي",
+      selectDept:"اختر القسم", selectProgram:"اختر البرنامج", selectDeptFirst:"اختر القسم أولاً",
+      noProgram:"لا توجد برامج لهذا القسم",
+      errDept:"من فضلك اختار القسم.", errProgram:"من فضلك اختار البرنامج.",
       footNote:"بالمتابعة أنت توافق على استخدام بياناتك الجامعية لعرض المسابقات المناسبة لقسمك فقط.",
       errDomain:"التسجيل متاح فقط بإيميل الجامعة الذي ينتهي بـ @feng.bu.edu.eg",
       errFullName:"من فضلك اكتب اسمك بالكامل.",
@@ -456,7 +456,10 @@
       lblEmailIn:"University email", lblPassIn:"Password", signinBtn:"Sign in", forgotBtn:"Forgot password?",
       lblEmailUp:"University email", lblPassUp:"Password", lblPassConfirm:"Confirm password", signupBtn:"Create account",
       lblFullName:"Full name",
-      lblDept:"Department", lblMajor:"Major", lblYear:"Academic year", lblSid:"Student ID",
+      lblDept:"Department", lblMajor:"Program", lblYear:"Academic year", lblSid:"Student ID",
+      selectDept:"Select department", selectProgram:"Select program", selectDeptFirst:"Select a department first",
+      noProgram:"No programs for this department",
+      errDept:"Please select your department.", errProgram:"Please select your program.",
       footNote:"By continuing, you agree your university data is used to show competitions relevant to your department only.",
       errDomain:"Sign-up is only allowed with a university email ending in @feng.bu.edu.eg",
       errFullName:"Please enter your full name.",
@@ -478,16 +481,39 @@
   // Canonical value stays Arabic (so stored/Firestore data never changes),
   // only the displayed label switches with the language.
   const DEPTS = [
-    { value:"هندسة الإنتاج", ar:"هندسة الإنتاج", en:"Production Engineering" },
-    { value:"هندسة القوى الميكانيكية", ar:"هندسة القوى الميكانيكية", en:"Mechanical Power Engineering" },
-    { value:"هندسة الحاسبات", ar:"هندسة الحاسبات", en:"Computer Engineering" },
-    { value:"الهندسة الكهربية", ar:"الهندسة الكهربية", en:"Electrical Engineering" }
+    { value:"قسم العلوم الأساسية", ar:"قسم العلوم الأساسية", en:"Basic Sciences Department" },
+    { value:"قسم الهندسة الكهربائية", ar:"قسم الهندسة الكهربائية", en:"Electrical Engineering Department" },
+    { value:"قسم هندسة الاتصالات", ar:"قسم هندسة الاتصالات", en:"Communications Engineering Department" },
+    { value:"قسم الهندسة الميكانيكية", ar:"قسم الهندسة الميكانيكية", en:"Mechanical Engineering Department" },
+    { value:"قسم الهندسة المدنية", ar:"قسم الهندسة المدنية", en:"Civil Engineering Department" },
+    { value:"قسم الهندسة المعمارية", ar:"قسم الهندسة المعمارية", en:"Architectural Engineering Department" },
+    { value:"قسم هندسة الجيوماتكس", ar:"قسم هندسة الجيوماتكس", en:"Geomatics Engineering Department" }
   ];
-  const MAJORS = [
-    { value:"عام", ar:"عام", en:"General" },
-    { value:"تصنيع", ar:"تصنيع", en:"Manufacturing" },
-    { value:"تصميم ميكانيكي", ar:"تصميم ميكانيكي", en:"Mechanical Design" }
-  ];
+  const PROGRAMS_BY_DEPT = {
+    "قسم العلوم الأساسية": [],
+    "قسم الهندسة الكهربائية": [
+      { value:"هندسة القوى والآلات الكهربائية", ar:"هندسة القوى والآلات الكهربائية", en:"Electrical Power and Machines Engineering" }
+    ],
+    "قسم هندسة الاتصالات": [
+      { value:"هندسة الاتصالات والإلكترونيات", ar:"هندسة الاتصالات والإلكترونيات", en:"Communications and Electronics Engineering" },
+      { value:"هندسة نظم الحاسبات", ar:"هندسة نظم الحاسبات", en:"Computer Systems Engineering" }
+    ],
+    "قسم الهندسة الميكانيكية": [
+      { value:"هندسة الإنتاج والتصميم الميكانيكي", ar:"هندسة الإنتاج والتصميم الميكانيكي", en:"Production and Mechanical Design Engineering" },
+      { value:"هندسة القوى الميكانيكية", ar:"هندسة القوى الميكانيكية", en:"Mechanical Power Engineering" },
+      { value:"هندسة الميكاترونكس", ar:"هندسة الميكاترونكس", en:"Mechatronics Engineering" }
+    ],
+    "قسم الهندسة المدنية": [
+      { value:"الهندسة المدنية العامة", ar:"الهندسة المدنية العامة", en:"General Civil Engineering" },
+      { value:"الهندسة المدنية الإنشائية", ar:"الهندسة المدنية الإنشائية", en:"Structural Civil Engineering" }
+    ],
+    "قسم الهندسة المعمارية": [
+      { value:"الهندسة المعمارية", ar:"الهندسة المعمارية", en:"Architectural Engineering" }
+    ],
+    "قسم هندسة الجيوماتكس": [
+      { value:"هندسة الجيوماتكس", ar:"هندسة الجيوماتكس", en:"Geomatics Engineering" }
+    ]
+  };
   const YEARS = [
     { value:"الأولى", ar:"الأولى", en:"1st Year" },
     { value:"الثانية", ar:"الثانية", en:"2nd Year" },
@@ -499,6 +525,25 @@
     const prev = selectEl.value;
     selectEl.innerHTML = list.map(item => `<option value="${item.value}">${item[lang]}</option>`).join("");
     if (prev) selectEl.value = prev;
+  }
+
+  function fillDeptSelect(deptEl, lang, selected){
+    deptEl.innerHTML = `<option value="">${strings[lang].selectDept}</option>` +
+      DEPTS.map(d => `<option value="${d.value}">${d[lang]}</option>`).join("");
+    deptEl.value = DEPTS.some(d => d.value === selected) ? selected : "";
+  }
+  function fillProgramSelect(programEl, deptValue, lang, selected){
+    const list = PROGRAMS_BY_DEPT[deptValue] || [];
+    let placeholder = strings[lang].selectDeptFirst;
+    if (deptValue) placeholder = list.length ? strings[lang].selectProgram : strings[lang].noProgram;
+    programEl.innerHTML = `<option value="">${placeholder}</option>` +
+      list.map(p => `<option value="${p.value}">${p[lang]}</option>`).join("");
+    programEl.disabled = list.length === 0;
+    programEl.value = list.some(p => p.value === selected) ? selected : "";
+  }
+  function refreshDeptProgram(deptEl, programEl, lang){
+    fillDeptSelect(deptEl, lang, deptEl.value);
+    fillProgramSelect(programEl, deptEl.value, lang, programEl.value);
   }
 
   let current = "ar";
@@ -536,14 +581,17 @@
     const stat = document.querySelectorAll("#statStrip span");
     stat[0].textContent = s.stat1; stat[1].textContent = s.stat2; stat[2].textContent = s.stat3;
     document.querySelectorAll("#statStrip strong")[2].textContent = s.stat3v;
-    translateSelect(document.getElementById("dept"), DEPTS, code);
-    translateSelect(document.getElementById("major"), MAJORS, code);
+    refreshDeptProgram(document.getElementById("dept"), document.getElementById("major"), code);
     translateSelect(document.getElementById("year"), YEARS, code);
     localStorage.setItem("uch_lang", code);
   }
 
   document.getElementById("langToggle").addEventListener("click", () => {
     applyLang(current === "ar" ? "en" : "ar");
+  });
+
+  document.getElementById("dept").addEventListener("change", () => {
+    fillProgramSelect(document.getElementById("major"), document.getElementById("dept").value, current, "");
   });
 
   // Keep whichever language the person last chose (on this page or home.html).
@@ -684,6 +732,10 @@
 
     if (!isAllowedEmail(email)) { showAuthError(strings[current].errDomain); return; }
     if (!fullName) { showAuthError(strings[current].errFullName); return; }
+    const deptVal = document.getElementById("dept").value;
+    const progVal = document.getElementById("major").value;
+    if (!deptVal) { showAuthError(strings[current].errDept); return; }
+    if ((PROGRAMS_BY_DEPT[deptVal] || []).length > 0 && !progVal) { showAuthError(strings[current].errProgram); return; }
     if (!document.getElementById("notifConsent").checked) { showAuthError(strings[current].errNotifConsent); return; }
     if (password !== confirm) { showAuthError(strings[current].errPasswordMismatch); return; }
     if (password.length < 6) { showAuthError(strings[current].errWeakPassword); return; }
@@ -708,6 +760,7 @@
       await signOut(auth); // don't let them into the app until they verify
 
       document.getElementById("signupForm").reset();
+      fillProgramSelect(document.getElementById("major"), "", current, "");
       showSuccess(strings[current].verifyEmailSent);
       switchTabKeepMessage("signin");
     } catch (err) {
