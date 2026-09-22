@@ -874,6 +874,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
     initWhatsNewBaseline();
     listenToMyRegistrations();
     listenToCompetitions();
+    listenToContacts();
     registerPushToken();
     openFromUrlIfNeeded();
 
@@ -975,19 +976,32 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{
   });
 
   // ---------- Contacts (youth-care staff) ----------
-  const contacts = [
-    { name: "أ. محمد عبد الله", role_ar: "مسؤول رعاية الشباب", role_en: "Student Affairs Officer", phone: "201019461036" },
-    { name: "أ. سارة حسن", role_ar: "منسقة المسابقات", role_en: "Competitions Coordinator", phone: "201554677212" }
-  ];
+  // Loaded from Firestore (managed by the admin from admin.html) instead of a
+  // hardcoded list, so Student Affairs can add/remove/reorder people without
+  // a code change. Realtime listener started once the student is signed in
+  // (see onAuthStateChanged below), same pattern as listenToCompetitions().
+  let contacts = [];
+  function listenToContacts() {
+    const q = query(collection(db, "contacts"), orderBy("order", "asc"));
+    onSnapshot(q, (snap) => {
+      contacts = snap.docs.map(d => d.data());
+      renderContacts();
+    }, (err) => console.error("contacts listener error:", err));
+  }
   function renderContacts() {
     const list = document.getElementById("contactList");
-    list.innerHTML = contacts.map(c => `
-      <a class="contact-row" href="https://wa.me/${c.phone}" target="_blank" rel="noopener">
-        <span class="wa-icon"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2zm5.7 14.2c-.2.6-1.4 1.2-1.9 1.2-.5.1-1.1.1-1.8-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.6-1.2-3.1s.8-2.2 1.1-2.5c.3-.3.6-.4.8-.4h.6c.2 0 .4 0 .6.5.2.6.7 1.9.8 2 .1.2.1.4 0 .6-.1.2-.2.3-.4.5-.2.2-.4.4-.5.6-.2.2-.4.4-.2.7.2.3.9 1.5 2 2.4 1.4 1.2 2.5 1.6 2.9 1.8.3.1.5.1.7-.1.2-.2.8-.9 1-1.2.2-.3.4-.3.7-.2.3.1 1.9.9 2.2 1.1.3.1.5.2.6.3.1.2.1.9-.1 1.5z"/></svg></span>
-        <div><strong>${c.name}</strong><span>${current === "ar" ? c.role_ar : c.role_en}</span></div>
-      </a>`).join("");
+    if (!list) return;
+    list.innerHTML = contacts.map(c => {
+      const digits = (c.phone || "").replace(/[^\d]/g, "");
+      if (!digits) return "";
+      const roleLabel = current === "ar" ? (c.role_ar || "") : (c.role_en || "");
+      return `
+      <a class="contact-row" href="https://wa.me/${digits}" target="_blank" rel="noopener">
+        <span class="wa-icon">${WA_ICON_SVG}</span>
+        <div><strong>${escapeHtml(c.name)}</strong><span>${escapeHtml(roleLabel)}</span></div>
+      </a>`;
+    }).join("");
   }
-  renderContacts();
 
   // ---------- Competitions feed (realtime) ----------
   function listenToCompetitions() {

@@ -286,6 +286,11 @@
     </div>
 
     <div class="side-section">
+      <p class="side-label" id="lblContactsSection">Student Affairs Contacts</p>
+      <button class="save-btn outline" id="contactsBtn"><span id="contactsBtnLabel">☎️ Manage Contacts</span> (<span id="contactsCount">0</span>)</button>
+    </div>
+
+    <div class="side-section">
       <p class="side-label" id="lblAppSection">App</p>
       <button class="save-btn" id="installAppBtn" style="margin-bottom:8px;"><span id="installBtnLabel">📲 Install App</span></button>
       <button class="save-btn outline" id="forceUpdateBtn"><span id="updateBtnLabel">🔄 Force Update (Clear Cache)</span></button>
@@ -418,6 +423,37 @@
     </div>
   </div>
 
+  <!-- ---------- Student Affairs contacts modal ---------- -->
+  <div class="modal-scrim" id="contactsModalScrim">
+    <div class="modal">
+      <h2 id="contactsModalTitle">Student Affairs Contacts</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:-8px;" id="contactsModalHint">Shown to students in the sidebar under "Contact us" — add whoever they should reach out to for help.</p>
+      <div id="contactsList"></div>
+      <div class="field" style="margin-top:18px;border-top:1px solid var(--line);padding-top:16px;">
+        <label id="lblContactName">Name</label>
+        <input type="text" id="fContactName" placeholder="e.g. Mr. Mohamed Abdullah">
+      </div>
+      <div class="field">
+        <label id="lblContactRoleAr">Role (Arabic)</label>
+        <input type="text" id="fContactRoleAr" placeholder="مسؤول رعاية الشباب">
+      </div>
+      <div class="field">
+        <label id="lblContactRoleEn">Role (English)</label>
+        <input type="text" id="fContactRoleEn" placeholder="Student Affairs Officer">
+      </div>
+      <div class="field">
+        <label id="lblContactPhone">WhatsApp phone number</label>
+        <input type="text" id="fContactPhone" placeholder="e.g. 01019461036" inputmode="tel">
+      </div>
+      <p id="contactFormError" style="display:none;font-size:12.5px;color:var(--coral);margin:-6px 0 10px;"></p>
+      <button type="button" class="btn" id="addContactBtn" style="width:100%;">+ <span id="addContactBtnLabel">Add Contact</span></button>
+      <button type="button" class="btn secondary" id="cancelEditContactBtn" style="width:100%;margin-top:8px;display:none;"><span id="cancelEditContactBtnLabel">Cancel Edit</span></button>
+      <div class="row-between" style="margin-top:18px;justify-content:flex-end;">
+        <button type="button" class="btn secondary" id="closeContactsBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ---------- Close competition / winners modal ---------- -->
   <div class="modal-scrim" id="winModalScrim">
     <div class="modal">
@@ -460,6 +496,8 @@
   let competitions = [];
   let editingId = null;
   let closingId = null;
+  let contactItems = []; // Student Affairs contacts shown to students in the sidebar
+  let editingContactId = null; // set while the form is editing an existing contact instead of creating a new one
   let studentDetailsMap = {}; // studentId -> [{ title, rank, participationType, supervisorName }]
 
   // ---------- Leaderboard data (loaded on demand — NOT a realtime listener) ----------
@@ -492,6 +530,21 @@
       compsSection: "Competitions",
       trashLabel: "🗑️ Deleted Competitions",
       appSection: "App",
+      contactsSection: "Student Affairs Contacts",
+      contactsBtn: "☎️ Manage Contacts",
+      contactsModalTitle: "Student Affairs Contacts",
+      contactsModalHint: 'Shown to students in the sidebar under "Contact us" — add whoever they should reach out to for help.',
+      lblContactName: "Name",
+      lblContactRoleAr: "Role (Arabic)",
+      lblContactRoleEn: "Role (English)",
+      lblContactPhone: "WhatsApp phone number",
+      addContactBtn: "Add Contact",
+      contactsEmpty: "No contacts added yet.",
+      contactFormRequired: "Please fill in the name, both role fields, and the phone number.",
+      contactDeleteConfirm: "Remove this contact from the students' list?",
+      btnEditContact: "✏️ Edit",
+      saveContactBtn: "Save Changes",
+      cancelEditContactBtn: "Cancel Edit",
       installBtn: "📲 Install App",
       updateBtn: "🔄 Force Update (Clear Cache)",
       logoutBtn: "Sign Out",
@@ -610,6 +663,21 @@
       compsSection: "المسابقات",
       trashLabel: "🗑️ المسابقات المحذوفة",
       appSection: "التطبيق",
+      contactsSection: "جهات اتصال رعاية الشباب",
+      contactsBtn: "☎️ إدارة جهات الاتصال",
+      contactsModalTitle: "جهات اتصال رعاية الشباب",
+      contactsModalHint: 'بتظهر للطلبة في القائمة الجانبية تحت "تواصل معنا" — ضيف اللي المفروض الطلبة يتواصلوا معاهم لو عندهم مشكلة.',
+      lblContactName: "الاسم",
+      lblContactRoleAr: "المسمى الوظيفي (عربي)",
+      lblContactRoleEn: "المسمى الوظيفي (إنجليزي)",
+      lblContactPhone: "رقم الواتساب",
+      addContactBtn: "إضافة جهة اتصال",
+      contactsEmpty: "لسه مفيش جهات اتصال مضافة.",
+      contactFormRequired: "من فضلك املأ الاسم والمسمى الوظيفي بالعربي والإنجليزي ورقم الهاتف.",
+      contactDeleteConfirm: "تشيل جهة الاتصال دي من قائمة الطلبة؟",
+      btnEditContact: "✏️ تعديل",
+      saveContactBtn: "حفظ التعديلات",
+      cancelEditContactBtn: "إلغاء التعديل",
       installBtn: "📲 تثبيت التطبيق",
       updateBtn: "🔄 تحديث فوري (مسح الكاش)",
       logoutBtn: "تسجيل الخروج",
@@ -766,6 +834,17 @@
     document.getElementById("lblLangSection").textContent = t("langSection");
     document.getElementById("lblCompsSection").textContent = t("compsSection");
     document.getElementById("trashLabel").textContent = t("trashLabel");
+    document.getElementById("lblContactsSection").textContent = t("contactsSection");
+    document.getElementById("contactsBtnLabel").textContent = t("contactsBtn");
+    document.getElementById("contactsModalTitle").textContent = t("contactsModalTitle");
+    document.getElementById("contactsModalHint").textContent = t("contactsModalHint");
+    document.getElementById("lblContactName").textContent = t("lblContactName");
+    document.getElementById("lblContactRoleAr").textContent = t("lblContactRoleAr");
+    document.getElementById("lblContactRoleEn").textContent = t("lblContactRoleEn");
+    document.getElementById("lblContactPhone").textContent = t("lblContactPhone");
+    document.getElementById("addContactBtnLabel").textContent = editingContactId ? t("saveContactBtn") : t("addContactBtn");
+    document.getElementById("cancelEditContactBtnLabel").textContent = t("cancelEditContactBtn");
+    document.getElementById("closeContactsBtn").textContent = t("close");
     document.getElementById("lblAppSection").textContent = t("appSection");
     document.getElementById("installBtnLabel").textContent = t("installBtn");
     document.getElementById("updateBtnLabel").textContent = t("updateBtn");
@@ -823,6 +902,7 @@
     // Leaderboard: re-render from cache only (no Firestore reads, and nothing
     // runs before sign-in). It is fetched lazily when its tab is opened.
     if (leaderboardInteractions) renderLeaderboard();
+    if (contactItems.length) renderContactsAdmin();
   }
 
   // ---------- Admin-only guard ----------
@@ -1200,6 +1280,122 @@
   document.getElementById("trashBtn").addEventListener("click", openTrashModal);
   document.getElementById("closeTrashBtn").addEventListener("click", () =>
     document.getElementById("trashModalScrim").classList.remove("show"));
+
+  // ---------- Student Affairs contacts (shown to students in the sidebar) ----------
+  async function loadContactsAdmin() {
+    const snap = await getDocs(query(collection(db, "contacts"), orderBy("order", "asc")));
+    contactItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderContactsAdmin();
+  }
+
+  function renderContactsAdmin() {
+    const list = document.getElementById("contactsList");
+    const countEl = document.getElementById("contactsCount");
+    if (countEl) countEl.textContent = contactItems.length;
+    if (contactItems.length === 0) {
+      list.innerHTML = `<p style="font-size:12.5px;color:var(--ink-soft);">${t("contactsEmpty")}</p>`;
+      return;
+    }
+    list.innerHTML = contactItems.map((c, i) => `
+      <div class="student-card">
+        <div class="sc-name">${escapeHtml(c.name)}</div>
+        <div class="sc-type">${escapeHtml(currentLang === "ar" ? c.role_ar : c.role_en)}</div>
+        <div class="sc-extra">📞 ${escapeHtml(c.phone)}</div>
+        <div class="sc-contact-row">
+          ${i > 0 ? `<button type="button" class="btn small secondary" data-move-contact="${c.id}" data-dir="-1">▲</button>` : ""}
+          ${i < contactItems.length - 1 ? `<button type="button" class="btn small secondary" data-move-contact="${c.id}" data-dir="1">▼</button>` : ""}
+          <button type="button" class="btn small secondary" data-edit-contact="${c.id}">${t("btnEditContact")}</button>
+          <button type="button" class="btn small danger" data-remove-contact="${c.id}">${t("btnDelete")}</button>
+        </div>
+      </div>`).join("");
+    list.querySelectorAll("[data-remove-contact]").forEach(btn =>
+      btn.addEventListener("click", () => deleteContact(btn.dataset.removeContact)));
+    list.querySelectorAll("[data-move-contact]").forEach(btn =>
+      btn.addEventListener("click", () => moveContact(btn.dataset.moveContact, Number(btn.dataset.dir))));
+    list.querySelectorAll("[data-edit-contact]").forEach(btn =>
+      btn.addEventListener("click", () => startEditContact(btn.dataset.editContact)));
+  }
+
+  async function deleteContact(id) {
+    if (!confirm(t("contactDeleteConfirm"))) return;
+    await deleteDoc(doc(db, "contacts", id));
+    await loadContactsAdmin();
+  }
+
+  async function moveContact(id, dir) {
+    const idx = contactItems.findIndex(c => c.id === id);
+    const swapIdx = idx + dir;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= contactItems.length) return;
+    const a = contactItems[idx], b = contactItems[swapIdx];
+    await Promise.all([
+      updateDoc(doc(db, "contacts", a.id), { order: swapIdx }),
+      updateDoc(doc(db, "contacts", b.id), { order: idx }),
+    ]);
+    await loadContactsAdmin();
+  }
+
+  function resetContactForm() {
+    editingContactId = null;
+    document.getElementById("contactFormError").style.display = "none";
+    document.getElementById("fContactName").value = "";
+    document.getElementById("fContactRoleAr").value = "";
+    document.getElementById("fContactRoleEn").value = "";
+    document.getElementById("fContactPhone").value = "";
+    document.getElementById("addContactBtnLabel").textContent = t("addContactBtn");
+    document.getElementById("cancelEditContactBtn").style.display = "none";
+  }
+
+  function startEditContact(id) {
+    const c = contactItems.find(x => x.id === id);
+    if (!c) return;
+    editingContactId = id;
+    document.getElementById("contactFormError").style.display = "none";
+    document.getElementById("fContactName").value = c.name || "";
+    document.getElementById("fContactRoleAr").value = c.role_ar || "";
+    document.getElementById("fContactRoleEn").value = c.role_en || "";
+    document.getElementById("fContactPhone").value = c.phone || "";
+    document.getElementById("addContactBtnLabel").textContent = t("saveContactBtn");
+    document.getElementById("cancelEditContactBtn").style.display = "block";
+    document.getElementById("fContactName").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  document.getElementById("cancelEditContactBtn").addEventListener("click", resetContactForm);
+
+  function openContactsModal() {
+    resetContactForm();
+    loadContactsAdmin();
+    document.getElementById("contactsModalScrim").classList.add("show");
+  }
+  document.getElementById("contactsBtn").addEventListener("click", openContactsModal);
+  document.getElementById("closeContactsBtn").addEventListener("click", () =>
+    document.getElementById("contactsModalScrim").classList.remove("show"));
+
+  document.getElementById("addContactBtn").addEventListener("click", async () => {
+    const errEl = document.getElementById("contactFormError");
+    errEl.style.display = "none";
+    const name = document.getElementById("fContactName").value.trim();
+    const roleAr = document.getElementById("fContactRoleAr").value.trim();
+    const roleEn = document.getElementById("fContactRoleEn").value.trim();
+    let phone = document.getElementById("fContactPhone").value.trim().replace(/[^\d]/g, "");
+    if (!name || !roleAr || !roleEn || !phone) {
+      errEl.textContent = t("contactFormRequired");
+      errEl.style.display = "block";
+      return;
+    }
+    if (phone.startsWith("0")) phone = "20" + phone.slice(1); // رقم محلي مصري -> دولي (wa.me محتاجه من غير صفر في الأول)
+
+    if (editingContactId) {
+      await updateDoc(doc(db, "contacts", editingContactId), { name, role_ar: roleAr, role_en: roleEn, phone });
+    } else {
+      const order = contactItems.length;
+      await addDoc(collection(db, "contacts"), {
+        name, role_ar: roleAr, role_en: roleEn, phone, order,
+        createdAt: serverTimestamp(),
+      });
+    }
+    resetContactForm();
+    await loadContactsAdmin();
+  });
 
   // ---------- Per-student follow-up table ("Track Students") ----------
   // Scoped realtime listener, created on open and torn down on close, so a
